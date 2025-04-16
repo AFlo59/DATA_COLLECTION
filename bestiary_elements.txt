@@ -1,0 +1,18 @@
+donc pour le bestiary, il faut dl le csv de totues les creature , et via le BestiaryScrapper.py, for each mosnter click , and extrait the image, name it with the name of the monster and put it in the Data/Images/
+le csv dans le Data/CSV/
+
+CSV:
+le bouton pour acceder au download du bestiary, <button type="button" class="ve-btn ve-btn-default ve-btn-xs" id="btn-show-table" title="View and Download Creatures in Tabular Format">Table View</button>
+
+et le bouton download pour recuperer le csv des monstres, <button class="ve-btn ve-btn-primary">Download CSV</button>
+
+Images:
+apres chaque click sur un monstre.
+images portrait:<a href="img/bestiary/tokens/XMM/Aarakocra Aeromancer.webp" class="stats__wrp-token" target="_blank" rel="noopener noreferrer"><img src="img/bestiary/tokens/XMM/Aarakocra Aeromancer.webp" class="stats__token" alt="Token Image: Aarakocra Aeromancer" loading="lazy" style="max-width: 592px;"></a>
+
+images full:
+le bouton image si il existe pour ce monstre : <button class="ui-tab__btn-tab-head ve-btn ve-btn-default stat-tab-gen pt-2p px-4p pb-0">Images</button>
+
+puis : <a href="img/bestiary/XMM/Aarakocra.webp" target="_blank" rel="noopener noreferrer" title="Art credit: Aaron Miller">
+				<img class="rd__image" loading="lazy" src="img/bestiary/XMM/Aarakocra.webp">
+			</a>

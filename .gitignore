@@ -1,0 +1,16 @@
+Data/
+venv/
+env/
+.venv
+.env
+venv
+env
+pycache/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+*.pywz
+*.pyzw
+logs/
