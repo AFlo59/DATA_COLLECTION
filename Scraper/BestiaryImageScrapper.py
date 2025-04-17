@@ -14,8 +14,8 @@ from dataclasses import dataclass
 
 # Création des dossiers nécessaires
 os.makedirs("logs/bestiary", exist_ok=True)
-os.makedirs("Data/Images/tokens", exist_ok=True)
-os.makedirs("Data/Images/full", exist_ok=True)
+os.makedirs("Data/bestiary/Images/tokens", exist_ok=True)
+os.makedirs("Data/bestiary/Images/full", exist_ok=True)
 
 # Configuration du logging
 logging.basicConfig(
