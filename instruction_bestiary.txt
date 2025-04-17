@@ -12,7 +12,7 @@ ouvre la page: https://5e.tools/bestiary.html
 
 attendre que le js charger quand l'url change exemple: https://5e.tools/bestiary.html#aarakocra%20aeromancer_xmm
 
-desactiver tout les filtre ici
+desactiver tout les filtre un par un 
 normalement dans la liste je retrouve 3708 monstre
 
 click sur un monstre puis fait les etape suivantes:
@@ -32,3 +32,5 @@ le bouton contenu dans : <button class="ui-tab__btn-tab-head ve-btn ve-btn-defau
 puis : <a href="img/bestiary/XMM/Aarakocra.webp" target="_blank" rel="noopener noreferrer" title="Art credit: Aaron Miller">
 				<img class="rd__image" loading="lazy" src="img/bestiary/XMM/Aarakocra.webp">
 			</a>
+
+pour les images nomme les name_source

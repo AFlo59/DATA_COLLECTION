@@ -4,71 +4,102 @@ import time
 import asyncio
 import aiohttp
 import logging
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from urllib.parse import urljoin
-from typing import List, Optional
+import sys
+import traceback
+from typing import List, Optional, Any, Dict
 from dataclasses import dataclass
+from urllib.parse import urljoin
 
-# Création des dossiers nécessaires
-os.makedirs("logs/bestiary", exist_ok=True)
-os.makedirs("Data/bestiary/Images/tokens", exist_ok=True)
-os.makedirs("Data/bestiary/Images/full", exist_ok=True)
+# Add the parent directory to sys.path to enable imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-# Configuration du logging
-logging.basicConfig(
-    filename="logs/bestiary/image_scraper.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Conditionally import Selenium components
+try:
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SELENIUM_AVAILABLE = False
 
-# Ajout du logging console
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-logging.getLogger().addHandler(console_handler)
+# Import modular components - try different import styles for flexibility
+try:
+    # First try absolute imports
+    from Scrapper.Modules.SetupLogger import setup_directories, setup_logger
+    from Scrapper.Modules.DetectOS import get_os_info
+    from Scrapper.Modules.BrowserSetup import get_browser_driver, BrowserSetup
+except ImportError:
+    try:
+        # Then try relative imports
+        from Modules.SetupLogger import setup_directories, setup_logger
+        from Modules.DetectOS import get_os_info
+        from Modules.BrowserSetup import get_browser_driver, BrowserSetup
+    except ImportError:
+        # As a last resort, try direct imports if files are in the same directory
+        print("Failed to import modules. Check your project structure and Python path.")
+        print(f"Current sys.path: {sys.path}")
+        sys.exit(1)
 
-logger = logging.getLogger(__name__)
+# ===== Setup directories =====
+setup_directories([
+    "Logs/Bestiary", 
+    "Data/Bestiary/Images/tokens", 
+    "Data/Bestiary/Images/full"
+])
 
+# ===== Logging configuration =====
+logger = setup_logger("Logs/Bestiary/ImageScrapper.log")
+
+# ===== Data classes =====
 @dataclass
 class MonsterImage:
+    """Class representing a monster's image data"""
     name: str
+    source: Optional[str]
     token_url: Optional[str] = None
     full_url: Optional[str] = None
 
+
 def sanitize_filename(name: str) -> str:
-    """Nettoie le nom pour être compatible avec le système de fichiers."""
+    """
+    Convert a string to a safe filename
+    
+    Args:
+        name: String to sanitize
+        
+    Returns:
+        Sanitized string
+    """
     return re.sub(r'[\\/*?:"<>|]', "", name)
 
-def setup_driver():
-    """Configure et retourne le driver Chrome."""
-    options = uc.ChromeOptions()
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-blink-features=AutomationControlled')
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36")
-    
-    try:
-        driver = uc.Chrome(
-            options=options,
-            version_main=133,
-            suppress_welcome=True
-        )
-        return driver
-    except Exception as e:
-        logger.error(f"Échec de l'initialisation du driver Chrome: {e}")
-        raise
 
-async def download_image(session: aiohttp.ClientSession, image_url: str, save_path: str) -> bool:
-    """Télécharge une image de façon asynchrone."""
+async def download_image(
+    session: aiohttp.ClientSession, 
+    image_url: str, 
+    save_path: str,
+    base_url: str = "https://5e.tools/"
+) -> bool:
+    """
+    Downloads an image asynchronously
+    
+    Args:
+        session: aiohttp client session
+        image_url: URL of the image
+        save_path: Path to save the image
+        base_url: Base URL to prepend to relative URLs
+        
+    Returns:
+        Boolean indicating success
+    """
     try:
+        # Handle relative URLs
         if not image_url.startswith('http'):
-            base_url = "https://5e.tools/"
             image_url = urljoin(base_url, image_url)
         
+        # Set headers to mimic browser
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
             'Accept': 'image/webp,*/*',
@@ -76,118 +107,320 @@ async def download_image(session: aiohttp.ClientSession, image_url: str, save_pa
             'Referer': 'https://5e.tools/'
         }
         
+        # Download image
         async with session.get(image_url, headers=headers) as response:
             if response.status == 200:
+                # Ensure directory exists
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                
+                # Save image
                 with open(save_path, 'wb') as f:
                     f.write(await response.read())
-                logger.info(f"Image téléchargée avec succès : {save_path}")
+                logger.info(f"Image downloaded successfully: {save_path}")
                 return True
             else:
-                logger.error(f"Échec du téléchargement de {image_url}, status: {response.status}")
+                logger.error(f"Failed to download {image_url}, status: {response.status}")
                 return False
     except Exception as e:
-        logger.error(f"Erreur pendant le téléchargement de l'image {image_url}: {e}")
+        logger.error(f"Error downloading image {image_url}: {e}")
         return False
 
-async def process_monster_batch(driver: uc.Chrome, monster_elements: List, session: aiohttp.ClientSession, start_idx: int, batch_size: int, total_monsters: int):
-    """Traite un lot de monstres sans recharger la page inutilement."""
+
+async def process_monster_batch(
+    driver: Any, 
+    monster_elements: List, 
+    session: aiohttp.ClientSession, 
+    start_idx: int, 
+    batch_size: int, 
+    total_monsters: int
+) -> None:
+    """
+    Process a batch of monsters without reloading the page
+    
+    Args:
+        driver: Browser driver instance
+        monster_elements: List of monster elements
+        session: aiohttp client session
+        start_idx: Starting index
+        batch_size: Batch size
+        total_monsters: Total number of monsters
+    """
     wait = WebDriverWait(driver, 10)
+    short_wait = WebDriverWait(driver, 3)  # Shorter timeout for optional elements
     
     for i in range(start_idx, min(start_idx + batch_size, total_monsters)):
         try:
-            # Trouver le monstre actuel dans la liste
+            # Find current monster in the list
             current_monster = monster_elements[i]
-            name = current_monster.find_element(By.CSS_SELECTOR, "span.best-ecgen__name").text.strip()
-            safe_name = sanitize_filename(name)
-            logger.info(f"Traitement du monstre {i+1}/{total_monsters}: {name}")
             
-            # S'assurer que l'élément est visible
+            # Extract name and source
+            try:
+                name_el = current_monster.find_element(By.CSS_SELECTOR, "span.bold")
+                name = name_el.text.strip()
+            except Exception:
+                try:
+                    # Alternate selector for name
+                    name_el = current_monster.find_element(By.CSS_SELECTOR, "span.best-ecgen__name")
+                    name = name_el.text.strip()
+                except Exception as e:
+                    logger.warning(f"Could not find name for monster at index {i}: {e}")
+                    name = f"unknown_monster_{i}"
+            
+            # Try to get source
+            try:
+                source_el = current_monster.find_element(By.CSS_SELECTOR, "span.help-subtle")
+                source = source_el.text.strip().replace(" ", "")
+            except Exception:
+                try:
+                    # Alternate selector for source
+                    source_el = current_monster.find_element(By.CSS_SELECTOR, "span.best-ecgen__source")
+                    source = source_el.text.strip().replace(" ", "")
+                except Exception:
+                    source = "unknown"
+            
+            safe_name = sanitize_filename(f"{name.lower()}_{source.lower()}")
+            logger.info(f"Processing monster {i+1}/{total_monsters}: {name} ({source})")
+            
+            # Ensure element is visible
             driver.execute_script("arguments[0].scrollIntoView(true);", current_monster)
-            time.sleep(0.5)  # Petit délai pour le scroll
+            time.sleep(0.5)  # Small delay for scrolling
             
-            # 1. Cliquer sur le monstre et attendre le token
+            # Click on the monster and wait for the token
             driver.execute_script("arguments[0].click();", current_monster)
             
-            # Attendre et télécharger le token
+            # Process token and full image
+            token_url = None
+            full_url = None
+            
+            # Wait and download token
             try:
                 token_img = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "img.stats__token")))
                 token_url = token_img.get_attribute("src")
                 if token_url:
-                    token_path = os.path.join("Data", "Images", "tokens", f"{safe_name}.webp")
+                    token_path = os.path.join("Data", "Bestiary", "Images", "tokens", f"{safe_name}.webp")
                     await download_image(session, token_url, token_path)
                 
-                # 2. Cliquer sur l'onglet Images et télécharger l'image complète
+                # Try to click Images tab with a short timeout - it might not exist
+                has_images_tab = False
                 try:
-                    images_tab = wait.until(EC.element_to_be_clickable(
-                        (By.XPATH, "//button[contains(@class, 'ui-tab__btn-tab-head') and contains(@class, 'stat-tab-gen') and text()='Images']")
+                    # First check if the Images tab exists
+                    images_tabs = short_wait.until(EC.presence_of_all_elements_located(
+                        (By.XPATH, "//button[contains(@class, 'ui-tab__btn-tab-head') and contains(@class, 'stat-tab-gen')]")
                     ))
-                    driver.execute_script("arguments[0].click();", images_tab)
-                    time.sleep(1)  # Court délai pour le changement d'onglet
                     
-                    # Attendre et télécharger l'image complète
-                    full_img_container = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.rd__wrp-image")))
-                    full_img_link = full_img_container.find_element(By.CSS_SELECTOR, "a")
-                    full_url = full_img_link.get_attribute("href")
+                    # Find the Images tab if it exists
+                    images_tab = None
+                    for tab in images_tabs:
+                        if "Images" in tab.text:
+                            images_tab = tab
+                            has_images_tab = True
+                            break
                     
-                    if full_url:
-                        full_path = os.path.join("Data", "Images", "full", f"{safe_name}.webp")
-                        await download_image(session, full_url, full_path)
+                    if has_images_tab and images_tab:
+                        logger.debug(f"Images tab found for {name}")
+                        driver.execute_script("arguments[0].click();", images_tab)
+                        time.sleep(0.5)  # Short delay for tab change
+                        
+                        # Wait and download full image with a short timeout
+                        try:
+                            full_img_container = short_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.rd__wrp-image")))
+                            full_img_link = full_img_container.find_element(By.CSS_SELECTOR, "a")
+                            full_url = full_img_link.get_attribute("href")
+                            
+                            if full_url:
+                                full_path = os.path.join("Data", "Bestiary", "Images", "full", f"{safe_name}.webp")
+                                await download_image(session, full_url, full_path)
+                        except Exception as e:
+                            logger.debug(f"No full image for {name}: {e}")
+                    else:
+                        logger.debug(f"No Images tab found for {name}")
                 except Exception as e:
-                    logger.warning(f"Pas d'image complète pour {name}: {e}")
+                    logger.debug(f"Failed to check for Images tab for {name}: {e}")
             except Exception as e:
-                logger.error(f"Erreur lors du traitement de {name}: {e}")
+                logger.warning(f"Error processing token for {name}: {e}")
             
-            # Retourner à la liste en cliquant sur le premier onglet (Stats)
+            # No need to explicitly go back to Stats tab if we're already there
+            # Just close the monster details by clicking outside or pressing Escape
             try:
-                stats_tab = wait.until(EC.element_to_be_clickable(
-                    (By.XPATH, "//button[contains(@class, 'ui-tab__btn-tab-head') and contains(@class, 'stat-tab-gen') and contains(text(), 'Stat')]")
-                ))
-                driver.execute_script("arguments[0].click();", stats_tab)
+                # Try clicking the monster list again to close details
+                # Find the list container element first
+                list_container = driver.find_element(By.CSS_SELECTOR, "div.lst__cont-outer")
+                driver.execute_script("arguments[0].click();", list_container)
+                time.sleep(0.3)
+                
+                # Verify we're back on the list by checking if stats panel is gone
+                try:
+                    short_wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.stats")))
+                    logger.debug(f"Successfully closed {name} details")
+                except:
+                    # If clicking the list didn't work, try sending Escape key
+                    from selenium.webdriver.common.keys import Keys
+                    webdriver = driver
+                    webdriver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                    time.sleep(0.3)
+                    
+                    # If still not closed, try JavaScript to clear the hash
+                    try:
+                        short_wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.stats")))
+                    except:
+                        logger.debug(f"Using hash clear for {name}")
+                        driver.execute_script("window.location.hash = '';")
+                        time.sleep(0.5)
             except Exception as e:
-                logger.warning(f"Impossible de revenir à l'onglet Stats pour {name}: {e}")
+                logger.warning(f"Difficulty closing monster details for {name}: {e}")
+                # Last resort: clear hash and reload monster list
+                try:
+                    driver.execute_script("window.location.hash = '';")
+                    time.sleep(1)
+                    
+                    # Re-acquire monster elements if needed
+                    if i < total_monsters - 1:  # Only if we're not on the last monster
+                        logger.debug("Re-acquiring monster elements")
+                        for selector in ["a.lst__row-border", "a.lst__row", "div.lst__row-inner"]:
+                            try:
+                                new_monster_elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                                if new_monster_elements and len(new_monster_elements) > 0:
+                                    monster_elements = new_monster_elements
+                                    break
+                            except Exception:
+                                continue
+                except Exception as ee:
+                    logger.error(f"Critical failure handling monster {name}: {ee}")
             
         except Exception as e:
-            logger.error(f"Erreur lors du traitement du monstre à l'index {i}: {e}")
+            logger.error(f"Error processing monster at index {i}: {e}")
+            logger.debug(traceback.format_exc())
             continue
 
-async def main():
-    """Fonction principale d'exécution."""
-    driver = None
+
+async def main() -> None:
+    """Main function to run the scraper"""
+    # Log system information
     try:
-        driver = setup_driver()
+        os_info = get_os_info()
+        logger.info(f"Running on: {os_info['system']} {os_info['release']}")
+    except Exception as e:
+        logger.error(f"Could not get OS info: {e}")
+    
+    if not SELENIUM_AVAILABLE:
+        logger.error("Selenium is not available. Please install it with 'pip install selenium'")
+        return
+    
+    # Use the browser setup module
+    browser = BrowserSetup(logger)
+    driver = None
+    
+    try:
+        # Get driver
+        driver = browser.get_driver()
         
-        # Chargement initial
+        # Set page load timeout to avoid hanging
+        driver.set_page_load_timeout(60)
+        
+        # Navigate to target page
         driver.get('https://5e.tools/bestiary.html')
-        logger.info("Chargement de la page du bestiaire...")
-        time.sleep(5)
+        logger.info("Loading bestiary page...")
+        time.sleep(5)  # Give time for JS to initialize
+
+        # Wait for initial monster elements to load before disabling filters
+        try:
+            WebDriverWait(driver, 20).until(
+                lambda d: len(d.find_elements(By.CSS_SELECTOR, "a.lst__row-border")) > 0
+            )
+            logger.info("Initial monster list loaded, now disabling filters...")
+        except Exception as e:
+            logger.warning(f"Timeout waiting for initial monster list: {e}")
+            # Continue anyway as the page might still be usable
+
+        # Disable all filters
+        try:
+            filter_attempts = 0
+            max_filter_attempts = 5  # Limit attempts to avoid infinite loop
+            
+            while filter_attempts < max_filter_attempts:
+                pills = driver.find_elements(By.CSS_SELECTOR, "div.fltr__mini-pill:not([data-state='ignore'])")
+                if not pills:
+                    break
+                    
+                pills_cleared = 0
+                for p in pills:
+                    try:
+                        driver.execute_script("arguments[0].scrollIntoView(true);", p)
+                        time.sleep(0.2)
+                        driver.execute_script("arguments[0].click();", p)
+                        pills_cleared += 1
+                        time.sleep(0.3)
+                    except Exception as e:
+                        logger.warning(f"Could not disable filter: {str(p.text)}")
+                
+                if pills_cleared == 0:
+                    # If we couldn't clear any pills in this round, increment attempts
+                    filter_attempts += 1
+                
+            logger.info("All filters disabled.")
+        except Exception as e:
+            logger.warning(f"Error disabling filters: {e}")
         
-        # Attendre que la liste soit chargée
-        wait = WebDriverWait(driver, 20)
-        monster_elements = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.lst__row-border")))
+        # Try different CSS selectors for monster elements
+        monster_elements = []
+        selectors = [
+            "a.lst__row-border",  # Primary selector 
+            "a.lst__row",         # Alternative selector
+            "div.lst__row-inner"  # Fallback selector
+        ]
+        
+        for selector in selectors:
+            try:
+                logger.info(f"Trying to find monsters with selector: {selector}")
+                monster_elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                if monster_elements and len(monster_elements) > 0:
+                    logger.info(f"Found {len(monster_elements)} monsters using selector: {selector}")
+                    break
+            except Exception as e:
+                logger.warning(f"Error finding monsters with selector {selector}: {e}")
         
         total_monsters = len(monster_elements)
-        logger.info(f"Nombre total de monstres trouvés : {total_monsters}")
+        if total_monsters == 0:
+            logger.error("No monsters found. Check the page structure or CSS selectors.")
+            return
         
-        batch_size = 10  # On peut augmenter la taille du batch car on ne recharge plus la page
+        logger.info(f"Found {total_monsters} monsters to process")
+        
+        # Process monsters in batches using asyncio for image downloads
+        batch_size = 10
         async with aiohttp.ClientSession() as session:
             for start_idx in range(0, total_monsters, batch_size):
-                logger.info(f"Traitement du lot {start_idx//batch_size + 1}/{(total_monsters + batch_size - 1)//batch_size}")
-                await process_monster_batch(driver, monster_elements, session, start_idx, batch_size, total_monsters)
-        
-        logger.info("Scraping terminé avec succès!")
-        
+                batch_num = start_idx // batch_size + 1
+                total_batches = (total_monsters + batch_size - 1) // batch_size
+                logger.info(f"Processing batch {batch_num}/{total_batches} (monsters {start_idx+1}-{min(start_idx+batch_size, total_monsters)})")
+                
+                await process_monster_batch(
+                    driver, 
+                    monster_elements, 
+                    session, 
+                    start_idx, 
+                    batch_size, 
+                    total_monsters
+                )
+
+        logger.info(f"Scraping completed: {total_monsters} monsters processed.")
     except Exception as e:
-        logger.error(f"Erreur dans l'exécution principale: {e}")
-        raise
+        logger.error(f"Main error: {e}")
+        logger.debug(traceback.format_exc())
     finally:
-        if driver:
-            driver.quit()
-            logger.info("Navigateur fermé")
+        # Clean up
+        if browser and hasattr(browser, 'close'):
+            try:
+                browser.close()
+            except Exception as e:
+                logger.error(f"Error closing browser: {e}")
+
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Scraping interrupted by user")
     except Exception as e:
-        logger.error(f"Erreur dans la boucle principale: {e}")
-        print(f"Une erreur est survenue: {e}")
+        logger.error(f"Unhandled exception in main loop: {e}")
+        logger.debug(traceback.format_exc()) 
