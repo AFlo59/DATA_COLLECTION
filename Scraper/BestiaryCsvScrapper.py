@@ -8,6 +8,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 from pathlib import Path
 
+# Création des dossiers nécessaires
+os.makedirs("logs/bestiary", exist_ok=True)
+os.makedirs("Data/bestiary/CSV", exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
     filename="logs/bestiary/csv_scraper.log",
