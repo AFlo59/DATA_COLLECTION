@@ -166,17 +166,51 @@ async def process_monster_batch(
                     logger.warning(f"Could not find name for monster at index {i}: {e}")
                     name = f"unknown_monster_{i}"
             
-            # Try to get source
+            # Try to get source with improved selectors for MM'25 and other sources
+            source = "unknown"
             try:
-                source_el = current_monster.find_element(By.CSS_SELECTOR, "span.help-subtle")
-                source = source_el.text.strip().replace(" ", "")
-            except Exception:
-                try:
-                    # Alternate selector for source
-                    source_el = current_monster.find_element(By.CSS_SELECTOR, "span.best-ecgen__source")
-                    source = source_el.text.strip().replace(" ", "")
-                except Exception:
-                    source = "unknown"
+                # Try multiple source selectors in order
+                for selector in [
+                    "span[class*='source__']",    # Match any source class (best option)
+                    "span.source__XMM",           # Specific MM'25 source
+                    "span.ve-col-2.ve-text-center", # Layout-based selector
+                    "span.help-subtle",           # Original selector
+                    "span.best-ecgen__source"     # Alternative selector
+                ]:
+                    try:
+                        source_elements = current_monster.find_elements(By.CSS_SELECTOR, selector)
+                        if source_elements:
+                            for source_el in source_elements:
+                                # Extract source text
+                                src_text = source_el.text.strip()
+                                if src_text:
+                                    source = src_text.replace(" ", "")
+                                    logger.debug(f"Found source '{source}' for monster {name} using selector: {selector}")
+                                    break
+                            if source != "unknown":
+                                break
+                    except Exception as e:
+                        continue
+
+                # If still not found, try looking for title attribute
+                if source == "unknown":
+                    spans = current_monster.find_elements(By.TAG_NAME, "span")
+                    for span in spans:
+                        try:
+                            title = span.get_attribute("title")
+                            if title and ("Monster Manual" in title or "Manual of" in title):
+                                source = span.text.strip().replace(" ", "")
+                                logger.debug(f"Found source '{source}' from title attribute for monster {name}")
+                                break
+                        except:
+                            continue
+            except Exception as e:
+                logger.warning(f"Error finding source for monster {name}: {e}")
+                source = "unknown"
+
+            # Log source finding result
+            if source == "unknown":
+                logger.warning(f"Could not determine source for monster {name}, using 'unknown'")
             
             safe_name = sanitize_filename(f"{name.lower()}_{source.lower()}")
             logger.info(f"Processing monster {i+1}/{total_monsters}: {name} ({source})")
@@ -239,54 +273,9 @@ async def process_monster_batch(
             except Exception as e:
                 logger.warning(f"Error processing token for {name}: {e}")
             
-            # No need to explicitly go back to Stats tab if we're already there
-            # Just close the monster details by clicking outside or pressing Escape
-            try:
-                # Try clicking the monster list again to close details
-                # Find the list container element first
-                list_container = driver.find_element(By.CSS_SELECTOR, "div.lst__cont-outer")
-                driver.execute_script("arguments[0].click();", list_container)
-                time.sleep(0.3)
-                
-                # Verify we're back on the list by checking if stats panel is gone
-                try:
-                    short_wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.stats")))
-                    logger.debug(f"Successfully closed {name} details")
-                except:
-                    # If clicking the list didn't work, try sending Escape key
-                    from selenium.webdriver.common.keys import Keys
-                    webdriver = driver
-                    webdriver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-                    time.sleep(0.3)
-                    
-                    # If still not closed, try JavaScript to clear the hash
-                    try:
-                        short_wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, "div.stats")))
-                    except:
-                        logger.debug(f"Using hash clear for {name}")
-                        driver.execute_script("window.location.hash = '';")
-                        time.sleep(0.5)
-            except Exception as e:
-                logger.warning(f"Difficulty closing monster details for {name}: {e}")
-                # Last resort: clear hash and reload monster list
-                try:
-                    driver.execute_script("window.location.hash = '';")
-                    time.sleep(1)
-                    
-                    # Re-acquire monster elements if needed
-                    if i < total_monsters - 1:  # Only if we're not on the last monster
-                        logger.debug("Re-acquiring monster elements")
-                        for selector in ["a.lst__row-border", "a.lst__row", "div.lst__row-inner"]:
-                            try:
-                                new_monster_elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                                if new_monster_elements and len(new_monster_elements) > 0:
-                                    monster_elements = new_monster_elements
-                                    break
-                            except Exception:
-                                continue
-                except Exception as ee:
-                    logger.error(f"Critical failure handling monster {name}: {ee}")
-            
+            # No need to close anything - just continue to the next monster
+            # The monster details panel will update when we select another monster
+
         except Exception as e:
             logger.error(f"Error processing monster at index {i}: {e}")
             logger.debug(traceback.format_exc())
