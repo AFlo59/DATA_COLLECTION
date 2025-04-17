@@ -16,12 +16,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # ===== Setup directories =====
-os.makedirs("logs/condition", exist_ok=True)
+os.makedirs("Logs/Condition", exist_ok=True)
 os.makedirs("Data/Condition", exist_ok=True)
 
 # ===== Logging configuration =====
 logging.basicConfig(
-    filename="logs/condition/data_scraper.log",
+    filename="logs/condition/Data_scrapper.log",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
