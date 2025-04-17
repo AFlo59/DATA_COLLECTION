@@ -39,7 +39,7 @@ def main():
     try:
         # Import the scraper module
         print("Importing scraper module...")
-        from Scrapper.ConditionScrapperV2 import main as scraper_main
+        from Scrapper.ConditionScrapper import main as scraper_main
         
         # Run the scraper
         print("Starting the scraper...")

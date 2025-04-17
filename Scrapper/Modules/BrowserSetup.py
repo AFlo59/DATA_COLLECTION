@@ -2,6 +2,8 @@ import logging
 import os
 import time
 import sys
+import atexit
+import weakref
 from typing import Optional, Dict, Any, Tuple, List
 
 # Add parent directories to sys.path for imports
@@ -29,6 +31,22 @@ except ImportError:
 try:
     import undetected_chromedriver as uc
     UNDETECTED_AVAILABLE = True
+    
+    # Apply monkey patch to fix the shutdown error in undetected_chromedriver
+    original_del = uc.Chrome.__del__
+    
+    def patched_del(self):
+        try:
+            # Only call quit if the driver is still active
+            if hasattr(self, '_proc') and self._proc is not None:
+                # Use the safer self.stop() rather than self.quit()
+                self.stop()
+        except Exception:
+            pass
+    
+    # Replace the __del__ method to prevent errors
+    uc.Chrome.__del__ = patched_del
+    
 except ImportError:
     pass
 
@@ -62,6 +80,29 @@ except ImportError:
         
         def detect_chrome_version() -> Optional[int]:
             return None
+
+
+# List to track active drivers for cleanup
+_active_drivers = []
+
+
+def _cleanup_drivers():
+    """
+    Clean up any active drivers during application exit.
+    This helps prevent errors and resource leaks.
+    """
+    for driver_ref in _active_drivers[:]:
+        driver = driver_ref()
+        if driver is not None:
+            try:
+                driver.quit()
+            except Exception:
+                pass
+            _active_drivers.remove(driver_ref)
+
+
+# Register the cleanup function to run at exit
+atexit.register(_cleanup_drivers)
 
 
 class BrowserSetup:
@@ -141,6 +182,9 @@ class BrowserSetup:
                 else:
                     driver = uc.Chrome(options=options, suppress_welcome=True)
                 self.logger.info("Successfully initialized undetected_chromedriver")
+                
+                # Track the driver for cleanup
+                _active_drivers.append(weakref.ref(driver))
                 return driver
             except Exception as e:
                 self.logger.warning(f"Failed to initialize undetected_chromedriver: {e}")
@@ -152,6 +196,9 @@ class BrowserSetup:
                 service = ChromeService(ChromeDriverManager().install())
                 driver = webdriver.Chrome(service=service, options=options)
                 self.logger.info("Successfully initialized selenium with webdriver_manager")
+                
+                # Track the driver for cleanup
+                _active_drivers.append(weakref.ref(driver))
                 return driver
             except Exception as e:
                 self.logger.warning(f"Failed to initialize selenium with webdriver_manager: {e}")
@@ -165,6 +212,9 @@ class BrowserSetup:
                     service = ChromeService(executable_path=chrome_executable)
                     driver = webdriver.Chrome(service=service, options=options)
                     self.logger.info("Successfully initialized selenium with system ChromeDriver")
+                    
+                    # Track the driver for cleanup
+                    _active_drivers.append(weakref.ref(driver))
                     return driver
             except Exception as e:
                 self.logger.warning(f"Failed to initialize selenium with system ChromeDriver: {e}")
@@ -187,11 +237,20 @@ class BrowserSetup:
         """Close and clean up the browser driver"""
         if self.driver:
             try:
-                self.driver.quit()
+                # For undetected_chromedriver, use stop() instead of quit() to prevent errors
+                if UNDETECTED_AVAILABLE and isinstance(self.driver, uc.Chrome):
+                    self.driver.stop()
+                else:
+                    self.driver.quit()
                 self.logger.info("Browser driver closed")
             except Exception as e:
                 self.logger.warning(f"Error closing browser driver: {e}")
             finally:
+                # Remove from tracking list
+                for driver_ref in _active_drivers[:]:
+                    driver = driver_ref()
+                    if driver is self.driver or driver is None:
+                        _active_drivers.remove(driver_ref)
                 self.driver = None
 
 
