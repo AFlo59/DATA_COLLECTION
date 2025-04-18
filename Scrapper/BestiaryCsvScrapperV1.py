@@ -560,10 +560,8 @@ def download_bestiary_csv() -> bool:
         # Re-configure download settings before clicking Table View
         configure_download_settings(driver, downloads_path)
         
-        # Click the Table View button with retry logic
+        # Try to locate and click the Table View button - multiple strategies
         table_button_found = False
-        table_button_attempts = 0
-        max_table_button_attempts = 5  # Increased max attempts
         
         # Strategy 1: Find by ID
         try:
@@ -750,9 +748,9 @@ def download_bestiary_csv() -> bool:
                             # Set up before clicking
                             abs_download_path = os.path.abspath(downloads_path).replace("\\", "\\\\")
                             driver.execute_script(f"""
-                                arguments[0].setAttribute('download', 'bestiary.csv');
                                 window.customDownloadDir = '{abs_download_path}';
-                                window.localStorage.setItem('downloadPath', '{abs_download_path}');
+                                localStorage.setItem('downloadPath', '{abs_download_path}');
+                                arguments[0].setAttribute('download', 'bestiary.csv');
                             """, button)
                             
                             # Click the button
@@ -840,9 +838,7 @@ def download_bestiary_csv() -> bool:
                 else:
                     logger.warning(f"Direct API request failed with status {response.status_code}")
             except Exception as e:
-                download_attempts += 1
-                logger.warning(f"Download attempt {download_attempts} failed with error: {e}")
-                time.sleep(3)
+                logger.warning(f"Direct API request approach failed: {e}")
         
         # Check for the download
         if download_success:

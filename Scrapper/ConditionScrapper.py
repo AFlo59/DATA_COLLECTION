@@ -24,18 +24,26 @@ try:
 except ImportError:
     SELENIUM_AVAILABLE = False
 
-# Import modular components - try different import styles for flexibility
+# Import all modular components
 try:
     # First try absolute imports
-    from Scrapper.Modules.SetupLogger import setup_directories, setup_logger
+    from Scrapper.Modules.SetupLogger import setup_directories, setup_logger, get_logger
     from Scrapper.Modules.DetectOS import get_os_info
-    from Scrapper.Modules.BrowserSetup import get_browser_driver, BrowserSetup
+    from Scrapper.Modules.BrowserSetup import BrowserSetup
+    from Scrapper.Modules.BrowserCleanup import BrowserCleanup, ensure_browser_cleanup
+    from Scrapper.Modules.CookieHandler import CookieHandler
+    from Scrapper.Modules.ConfigManager import ConfigManager, get_config
+    from Scrapper.Modules.DetectPackages import check_dependency_compatibility
 except ImportError:
     try:
         # Then try relative imports
-        from Modules.SetupLogger import setup_directories, setup_logger
+        from Modules.SetupLogger import setup_directories, setup_logger, get_logger
         from Modules.DetectOS import get_os_info
-        from Modules.BrowserSetup import get_browser_driver, BrowserSetup
+        from Modules.BrowserSetup import BrowserSetup
+        from Modules.BrowserCleanup import BrowserCleanup, ensure_browser_cleanup
+        from Modules.CookieHandler import CookieHandler
+        from Modules.ConfigManager import ConfigManager, get_config
+        from Modules.DetectPackages import check_dependency_compatibility
     except ImportError:
         # As a last resort, try direct imports if files are in the same directory
         import sys
@@ -46,8 +54,11 @@ except ImportError:
 # ===== Setup directories =====
 setup_directories(["Logs/Condition", "Data/Condition"])
 
+# ===== Get configuration =====
+config = get_config()
+
 # ===== Logging configuration =====
-logger = setup_logger("Logs/Condition/DataScrapper.log")
+logger = get_logger("ConditionScrapper", log_dir="Logs/Condition")
 
 # ===== Data classes =====
 @dataclass
@@ -286,23 +297,43 @@ def main() -> None:
     except Exception as e:
         logger.error(f"Could not get OS info: {e}")
     
+    # Check package compatibility
+    is_compatible, warnings = check_dependency_compatibility()
+    if not is_compatible:
+        logger.warning("Some package compatibility issues detected:")
+        for warning in warnings:
+            logger.warning(f"  {warning}")
+    
     if not SELENIUM_AVAILABLE:
         logger.error("Selenium is not available. Please install it with 'pip install selenium'")
         return
     
-    # Use the browser setup module
-    browser = BrowserSetup(logger)
+    # Initialize browser management modules
+    browser_setup = BrowserSetup(logger)
+    browser_cleanup = BrowserCleanup(logger)
+    cookie_handler = CookieHandler(logger)
     driver = None
     
     try:
         # Get driver
-        driver = browser.get_driver()
+        driver = browser_setup.get_driver()
+        
+        # Register browser for automatic cleanup
+        browser_cleanup.register_browser(driver)
+        
+        # Configure browser settings from config
+        timeout = config.get("browser.page_load_timeout", 90)
+        driver.set_page_load_timeout(timeout)
         
         # Navigate to target page
         driver.get('https://5e.tools/conditionsdiseases.html')
         logger.info("Loading page...")
         time.sleep(5)  # Give time for JS to initialize
 
+        # Handle cookie consent if present
+        if cookie_handler.handle_consent(driver):
+            logger.info("Cookie consent handled.")
+        
         # Disable filters
         disable_filters(driver)
         
@@ -348,9 +379,9 @@ def main() -> None:
         logger.error(f"Main error: {e}")
         logger.debug(traceback.format_exc())
     finally:
-        # Clean up
-        if browser and hasattr(browser, 'close'):
-            browser.close()
+        # Clean up browser with enhanced method
+        if driver:
+            ensure_browser_cleanup(driver, logger)
 
 if __name__ == "__main__":
     main() 
