@@ -1,0 +1,131 @@
+La page RuleGlossary:https://5e.tools/variantrules.html
+
+Une fois le js charger: l'url doit changer via le premier element de la liste qui est selectionner par default exemple:https://5e.tools/variantrules.html#ability%20check_xphb
+
+La liste initialement compte 230 elements il faut desactiver les filtre un par un pour afficher les 243 elements
+
+la div qui contient tous les filtre: <div class="fltr__mini-view ve-btn-group">
+
+La Liste se trouve dans : <div id="list" class="lst__row we-flew-col list-multi-selected"></div>
+chaque filtre est un span dans une div avec un data-state="yes" par default : <div class="fltr__mini-pill fltr__mini-pill--default-sel" data-state="yes"><span></span></div>
+
+et chaque element de la list est composé d'une div:
+d'un lien a: <a class="lst__row we-flex-col lst__row-inner" href="#ability%20checkk_xphb"></a>
+
+
+le premier element de la lsite semble etre dans une div avec une class differentes: <div class="lst__row we-flex-col list-multi-selected"></div>
+
+puis de 3 span:
+    1er name: <span class="bold we-col-7 pl-0 pr-1">name</span>
+    2eme type: <span class="we-col-3 px-1 ve-text-center">type</span>
+    3 eme source: <span class="we-col-2 ve-text-center ">source</span>
+
+et pareil quand on click sur un element de la liste 
+
+le contentwraper sur le cote se met a jour: <div id="contentwraper" class="view-col"></div>
+et les information sotn contenue dans cette div la :<div id="wrp-pagecontent" class="relative wrp-stats-table"></div>
+
+peux avoir se format la :
+<tr><th class="ve-tbl-border" colspan="6"></th></tr>
+		
+		<tr>
+			<th class="stats__th-name ve-text-left pb-0 " colspan="6" data-name="Adamantine Weapons" data-page="variantrules.html" data-source="XGE" data-hash="adamantine%20weapons_xge">
+				<div class="split-v-end">
+					<div class="ve-flex-v-center">
+						<h1 class="stats__h-name copyable m-0" onmousedown="event.preventDefault()" onclick="Renderer.utils._pHandleNameClick(this)">Adamantine Weapons</h1>
+						
+						
+					</div>
+					<div class="stats__wrp-h-source  ve-flex-v-baseline">
+						<a href="book.html#XGE,page:78" class="help-subtle stats__h-source-abbreviation source__XGE" title="Xanathar’s Guide to Everything">XGE</a>
+
+						 <a href="book.html#XGE,page:78" class="rd__stats-name-page ml-1" title="Page 78">p78</a>
+
+						
+					</div>
+				</div>
+			</th>
+		</tr>
+		<tr><td colspan="6"><div data-source="XGE" class="rd__b  rd__b--0"><p>Adamantine is an ultrahard metal found in meteorites and extraordinary mineral veins. In addition to being used to craft <a href="items.html#adamantine%20armor_dmg" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="items.html" data-vet-source="DMG" data-vet-hash="adamantine%20armor_dmg" data-vet-is-allow-redirect="true" ontouchstart="Renderer.hover.handleTouchStart(event, this)">adamantine armor</a>, the metal is also used for weapons.</p><p>Melee weapons and ammunition made of or coated with adamantine are unusually effective when used to break objects. Whenever an <a href="items.html#adamantine%20weapon_xge" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="items.html" data-vet-source="xge" data-vet-hash="adamantine%20weapon_xge" ontouchstart="Renderer.hover.handleTouchStart(event, this)">adamantine weapon</a> or piece of <a href="items.html#adamantine%20ammunition_xge" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="items.html" data-vet-source="xge" data-vet-hash="adamantine%20ammunition_xge" ontouchstart="Renderer.hover.handleTouchStart(event, this)" style="">ammunition</a> hits an object, the hit is a critical hit.</p><p>The adamantine version of a melee weapon or of ten pieces of ammunition costs 500 gp more than the normal version, whether the weapon or ammunition is made of the metal or coated with it.</p></div></td></tr>
+		<tr><td colspan="6" class="pt-3"><b>Source:</b> <i title="Xanathar’s Guide to Everything">XGE</i>, page 78</td></tr>
+		<tr><th class="ve-tbl-border" colspan="6"></th></tr>
+
+ou se format la:
+
+<tr><th class="ve-tbl-border" colspan="6"></th></tr>
+		
+		<tr>
+			<th class="stats__th-name ve-text-left pb-0 " colspan="6" data-name="Action" data-page="variantrules.html" data-source="XPHB" data-hash="action_xphb">
+				<div class="split-v-end">
+					<div class="ve-flex-v-center">
+						<h1 class="stats__h-name copyable m-0" onmousedown="event.preventDefault()" onclick="Renderer.utils._pHandleNameClick(this)">Action</h1>
+						
+						
+					</div>
+					<div class="stats__wrp-h-source  ve-flex-v-baseline">
+						<a href="book.html#XPHB,page:360" class="help-subtle stats__h-source-abbreviation source__XPHB" title="Player’s Handbook (2024)">PHB'24</a>
+
+						 <a href="book.html#XPHB,page:360" class="rd__stats-name-page ml-1" title="Page 360">p360</a>
+
+						
+					</div>
+				</div>
+			</th>
+		</tr>
+		<tr><td colspan="6"><div data-source="XPHB" class="rd__b  rd__b--1"><p>On your turn, you can take one action. Choose which action to take from those below or from the special actions provided by your features. These actions are defined elsewhere in this glossary:</p><ul class="rd__list rd__list-hang-notitle columns-4"><li class="rd__li "><a href="actions.html#attack_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="attack_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Attack</a></li><li class="rd__li "><a href="actions.html#dodge_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="dodge_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Dodge</a></li><li class="rd__li "><a href="actions.html#dash_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="dash_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Dash</a></li><li class="rd__li "><a href="actions.html#help_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="help_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Help</a></li><li class="rd__li "><a href="actions.html#disengage_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="disengage_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Disengage</a></li><li class="rd__li "><a href="actions.html#hide_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="hide_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Hide</a></li><li class="rd__li "><a href="actions.html#influence_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="influence_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Influence</a></li><li class="rd__li "><a href="actions.html#magic_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="magic_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Magic</a></li><li class="rd__li "><a href="actions.html#ready_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="ready_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Ready</a></li><li class="rd__li "><a href="actions.html#search_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="search_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Search</a></li><li class="rd__li "><a href="actions.html#study_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="study_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Study</a></li><li class="rd__li "><a href="actions.html#utilize_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="actions.html" data-vet-source="XPHB" data-vet-hash="utilize_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Utilize</a></li></ul></div></td></tr>
+		<tr><td colspan="6" class="pt-3"><b>Source:</b> <i title="Player’s Handbook (2024)">PHB'24</i>, page 360. Available in the Free Rules (2024).</td></tr>
+		<tr><th class="ve-tbl-border" colspan="6"></th></tr>
+
+voir meme:<tr><th class="ve-tbl-border" colspan="6"></th></tr>
+		
+		<tr>
+			<th class="stats__th-name ve-text-left pb-0 " colspan="6" data-name="Alien Technology" data-page="variantrules.html" data-source="DMG" data-hash="alien%20technology_dmg">
+				<div class="split-v-end">
+					<div class="ve-flex-v-center">
+						<h1 class="stats__h-name copyable m-0" onmousedown="event.preventDefault()" onclick="Renderer.utils._pHandleNameClick(this)">Alien Technology</h1>
+						
+						
+					</div>
+					<div class="stats__wrp-h-source  ve-flex-v-baseline">
+						<a href="book.html#DMG,page:268" class="help-subtle stats__h-source-abbreviation source__DMG" title="Dungeon Master’s Guide (2014)">DMG'14</a>
+
+						 <a href="book.html#DMG,page:268" class="rd__stats-name-page ml-1" title="Page 268">p268</a>
+
+						
+					</div>
+				</div>
+			</th>
+		</tr>
+		<tr><td colspan="6"><div data-source="DMG" class="rd__b  rd__b--1"><p>When adventurers find a piece of technology that isn't from their world or time period, the players might understand what the object is, but the characters rarely will. To simulate a character's ignorance about the technology, have the character make a series of Intelligence checks to figure it out.</p><p>To determine how the technology works, a character must succeed on a number of Intelligence checks based on the complexity of the item: two successes for a simple item (such as a cigarette lighter, calculator, or revolver) and four successes for a complex item (such as a computer, chainsaw, or hovercraft). Then consult the Figuring Out Alien Technology table. Consider making the item break if a character fails four or more times before taking a long rest.</p><p>A character who has seen an item used or has operated a similar item has advantage on Intelligence checks made to figure out its use.</p><table class="w-100 rd__table  stripe-odd-table" data-roll-name-ancestor="Figuring Out Alien Technology"><caption>Figuring Out Alien Technology</caption><thead><tr><th class="rd__th ve-col-3 no-wrap " data-rd-isroller="false">Int. Check Total</th><th class="rd__th ve-col-9 " data-rd-isroller="false">Result</th></tr></thead><tbody><tr><td class="rd__th ve-col-3 no-wrap ">9 or lower</td><td class="rd__th ve-col-9 ">One failure; one charge or use is wasted, if applicable; character has disadvantage on next check</td></tr><tr><td class="rd__th ve-col-3 no-wrap ">10-14</td><td class="rd__th ve-col-9 ">One failure</td></tr><tr><td class="rd__th ve-col-3 no-wrap ">15-19</td><td class="rd__th ve-col-9 ">One success</td></tr><tr><td class="rd__th ve-col-3 no-wrap ">20 or higher</td><td class="rd__th ve-col-9 ">One success; character has advantage on next check</td></tr></tbody></table></div></td></tr>
+		<tr><td colspan="6" class="pt-3"><b>Source:</b> <i title="Dungeon Master’s Guide (2014)">DMG'14</i>, page 268</td></tr>
+		<tr><th class="ve-tbl-border" colspan="6"></th></tr>
+
+encore:
+
+<tr><th class="ve-tbl-border" colspan="6"></th></tr>
+		
+		<tr>
+			<th class="stats__th-name ve-text-left pb-0 " colspan="6" data-name="Condition" data-page="variantrules.html" data-source="XPHB" data-hash="condition_xphb">
+				<div class="split-v-end">
+					<div class="ve-flex-v-center">
+						<h1 class="stats__h-name copyable m-0" onmousedown="event.preventDefault()" onclick="Renderer.utils._pHandleNameClick(this)">Condition</h1>
+						
+						
+					</div>
+					<div class="stats__wrp-h-source  ve-flex-v-baseline">
+						<a href="book.html#XPHB,page:363" class="help-subtle stats__h-source-abbreviation source__XPHB" title="Player’s Handbook (2024)">PHB'24</a>
+
+						 <a href="book.html#XPHB,page:363" class="rd__stats-name-page ml-1" title="Page 363">p363</a>
+
+						
+					</div>
+				</div>
+			</th>
+		</tr>
+		<tr><td colspan="6"><div data-source="XPHB" class="rd__b  rd__b--1"><p>A condition is a temporary game state. The definition of a condition says how it affects its recipient, and various rules define how to end a condition. This glossary defines these conditions:</p><ul class="rd__list rd__list-hang-notitle columns-3"><li class="rd__li "><a href="conditionsdiseases.html#blinded_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="blinded_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Blinded</a></li><li class="rd__li "><a href="conditionsdiseases.html#charmed_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="charmed_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Charmed</a></li><li class="rd__li "><a href="conditionsdiseases.html#deafened_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="deafened_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)" style="">Deafened</a></li><li class="rd__li "><a href="conditionsdiseases.html#exhaustion_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="exhaustion_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Exhaustion</a></li><li class="rd__li "><a href="conditionsdiseases.html#frightened_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="frightened_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)" style="">Frightened</a></li><li class="rd__li "><a href="conditionsdiseases.html#grappled_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="grappled_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Grappled</a></li><li class="rd__li "><a href="conditionsdiseases.html#incapacitated_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="incapacitated_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Incapacitated</a></li><li class="rd__li "><a href="conditionsdiseases.html#invisible_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="invisible_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Invisible</a></li><li class="rd__li "><a href="conditionsdiseases.html#paralyzed_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="paralyzed_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Paralyzed</a></li><li class="rd__li "><a href="conditionsdiseases.html#petrified_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="petrified_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Petrified</a></li><li class="rd__li "><a href="conditionsdiseases.html#poisoned_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="poisoned_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Poisoned</a></li><li class="rd__li "><a href="conditionsdiseases.html#prone_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="prone_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Prone</a></li><li class="rd__li "><a href="conditionsdiseases.html#restrained_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="restrained_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Restrained</a></li><li class="rd__li "><a href="conditionsdiseases.html#stunned_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="stunned_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Stunned</a></li><li class="rd__li "><a href="conditionsdiseases.html#unconscious_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="unconscious_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)">Unconscious</a></li></ul><p>A condition doesn't stack with itself; a recipient either has a condition or doesn't. The <a href="conditionsdiseases.html#exhaustion_xphb" onmouseover="Renderer.hover.pHandleLinkMouseOver(event, this)" onmouseleave="Renderer.hover.handleLinkMouseLeave(event, this)" onmousemove="Renderer.hover.handleLinkMouseMove(event, this)" onclick="Renderer.hover.handleLinkClick(event, this)" ondragstart="Renderer.hover.handleLinkDragStart(event, this)" data-vet-page="conditionsdiseases.html" data-vet-source="XPHB" data-vet-hash="exhaustion_xphb" ontouchstart="Renderer.hover.handleTouchStart(event, this)" style="">Exhaustion</a> condition is an exception to that rule.</p></div></td></tr>
+		<tr><td colspan="6" class="pt-3"><b>Source:</b> <i title="Player’s Handbook (2024)">PHB'24</i>, page 363. Available in the Free Rules (2024).</td></tr>
+		<tr><th class="ve-tbl-border" colspan="6"></th></tr>
+
+je pense qu'il faut que tu essayer de recuperer chaque elements certain seront optionnel 
+oublie pas que si tu selectionne un autre element les dta devienne stale donc il faut recuperer les infos pui passer a un autres element de la liste
+et pour le coup renomme chaque RuleGlossary par le nom et la source en .json dans Data/RulesGlossary/
