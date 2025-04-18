@@ -13,4 +13,5 @@ pycache/
 *.pyz
 *.pywz
 *.pyzw
+Logs/
 logs/
