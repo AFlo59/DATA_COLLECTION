@@ -15,3 +15,4 @@ pycache/
 *.pyzw
 Logs/
 logs/
+Ignore/
