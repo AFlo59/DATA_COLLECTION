@@ -90,21 +90,62 @@ def disable_filters(driver: Any) -> None:
         driver: Browser driver instance
     """
     try:
-        while True:
-            pills = driver.find_elements(By.CSS_SELECTOR, "div.fltr__mini-pill:not([data-state='ignore'])")
-            if not pills:
-                break
-            for p in pills:
+        # Find all filter types (both active and disabled)
+        logger.info("Looking for filter container...")
+        filter_container = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".fltr__mini-view"))
+        )
+        logger.info("Found filter container, looking for filter pills...")
+        
+        # Find both types of filter pills by data-state
+        active_filters = filter_container.find_elements(By.CSS_SELECTOR, ".fltr__mini-pill[data-state='yes']")
+        deselected_filters = filter_container.find_elements(By.CSS_SELECTOR, ".fltr__mini-pill--default-desel[data-state='no']")
+        ignored_filters = filter_container.find_elements(By.CSS_SELECTOR, ".fltr__mini-pill[data-state='ignore']")
+        
+        # Combine active and deselected filters (exclude ignored filters)
+        all_filters = active_filters + deselected_filters
+        
+        logger.info(f"Found {len(active_filters)} active filters, {len(deselected_filters)} deselected filters, and {len(ignored_filters)} ignored filters")
+        
+        # Click each filter pill to disable/enable it
+        filters_processed = 0
+        for i, pill in enumerate(all_filters):
+            try:
+                # Get filter info before clicking
+                state = pill.get_attribute("data-state")
+                is_desel = "default-desel" in pill.get_attribute("class")
+                filter_text = pill.text.strip() if pill.text else f"Filter{i+1}"
+                
+                logger.info(f"Filter {i+1}/{len(all_filters)} '{filter_text}', current state: {state}, is deselected: {is_desel}")
+                
+                # Scroll into view and click
+                driver.execute_script("arguments[0].scrollIntoView(true);", pill)
+                time.sleep(0.2)  # Small delay for scrolling
+                driver.execute_script("arguments[0].click();", pill)
+                
+                # Get the new state for logging
                 try:
-                    driver.execute_script("arguments[0].scrollIntoView(true);", p)
-                    time.sleep(0.2)
-                    driver.execute_script("arguments[0].click();", p)
-                    time.sleep(0.3)
-                except Exception as e:
-                    logger.warning(f"Could not disable filter: {str(p.text)}")
-        logger.info("All filters disabled.")
+                    new_state = pill.get_attribute("data-state")
+                    logger.info(f"Filter {i+1}/{len(all_filters)} '{filter_text}' toggled: {state} -> {new_state}")
+                except:
+                    logger.info(f"Filter {i+1}/{len(all_filters)} '{filter_text}' toggled (couldn't get new state)")
+                
+                filters_processed += 1
+                time.sleep(0.3)  # Small delay to let the list update
+            except Exception as e:
+                logger.warning(f"Could not toggle filter {i+1}: {e}")
+        
+        # Verify by checking if we still have pills with data-state not 'ignore'
+        remaining_filters = driver.find_elements(By.CSS_SELECTOR, "div.fltr__mini-pill:not([data-state='ignore'])")
+        if remaining_filters:
+            logger.warning(f"Still found {len(remaining_filters)} filters that are not ignored after processing")
+        else:
+            logger.info("All filters processed successfully")
+        
+        logger.info(f"Filter processing complete: {filters_processed}/{len(all_filters)} filters processed")
     except Exception as e:
         logger.warning(f"Error disabling filters: {e}")
+        logger.debug(traceback.format_exc())
 
 
 def extract_table_data(el: Any) -> Optional[Dict]:
