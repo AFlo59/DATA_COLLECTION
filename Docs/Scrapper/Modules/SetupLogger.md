@@ -12,21 +12,24 @@ The `SetupLogger` module provides a standardized and flexible way to set up logg
 - **Configuration Integration**: Works with the ConfigManager module for centralized settings
 - **Module-Level Loggers**: Easy creation of loggers specific to each module
 - **Flexible Parameters**: Control over log levels, formats, and output options
+- **Automatic Log Cleaning**: Option to clean existing log files to prevent excessive file growth
 
 ## Core Functions
 
 - `setup_directories(directories)`: Creates multiple directory paths if they don't exist
-- `setup_logger(log_file, log_level=None, console_output=None, log_format=None)`: Sets up and configures a logger
-- `get_logger(name, log_dir=None)`: Gets a configured logger with automatic file path generation
-- `get_module_logger()`: Gets a logger for the current module with automatic naming
+- `clean_log_file(log_file)`: Cleans an existing log file by removing its contents
+- `setup_logger(log_file, log_level=None, console_output=None, log_format=None, clean_logs=None)`: Sets up and configures a logger
+- `get_logger(name, log_dir=None, clean_logs=None)`: Gets a configured logger with automatic file path generation
+- `get_module_logger(clean_logs=None)`: Gets a logger for the current module with automatic naming
 
 ## How It Works
 
 1. **Configuration Loading**: The module first attempts to load configuration from ConfigManager
 2. **Directory Creation**: Log directories are automatically created if they don't exist
-3. **Logger Setup**: A logger is created with the specified or default configuration
-4. **Output Handlers**: File and optional console handlers are configured
-5. **Format Configuration**: Log format is applied to all handlers
+3. **Log Cleaning**: If enabled, existing log files are cleaned before logging begins
+4. **Logger Setup**: A logger is created with the specified or default configuration
+5. **Output Handlers**: File and optional console handlers are configured
+6. **Format Configuration**: Log format is applied to all handlers
 
 ## Usage Examples
 
@@ -63,12 +66,25 @@ logger = setup_logger(
     log_file=log_file,
     log_level=logging.DEBUG,  # More verbose logging
     console_output=True,      # Output to console
-    log_format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"  # Custom format
+    log_format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Custom format
+    clean_logs=True           # Clean the log file on startup
 )
 
 # Use the configured logger
 logger.debug("Starting scraper with custom logging configuration")
 logger.info("Scraper initialized")
+```
+
+### Disable Log Cleaning
+
+```python
+from Scrapper.Modules.SetupLogger import get_logger
+
+# Get a logger that preserves existing log file content
+logger = get_logger("append_scraper", clean_logs=False)
+
+# New log entries will be appended to the existing file
+logger.info("This log entry will be appended to any existing content")
 ```
 
 ### Module-Level Logger
@@ -126,8 +142,9 @@ import os
 # Get the configuration manager
 config = get_config()
 
-# Set custom logging level in configuration
+# Set custom logging level and cleaning options in configuration
 config.set("logging.level", "DEBUG")
+config.set("logging.clean_logs", True)  # Clean logs on startup
 
 # Get a logger (which will use the config settings)
 logger = get_logger("config_example")
@@ -136,9 +153,31 @@ logger = get_logger("config_example")
 logger.debug("Debug message - visible because we set DEBUG level")
 logger.info("Info message")
 
-# Change log level at runtime
+# Change log level and cleaning preference at runtime
 config.set("logging.level", "WARNING")
+config.set("logging.clean_logs", False)  # Future loggers will preserve log content
 # Note: This won't affect existing loggers, only new ones
+```
+
+### Manually Cleaning Log Files
+
+```python
+from Scrapper.Modules.SetupLogger import clean_log_file, get_logger
+import os
+
+# Define a log file path
+log_dir = "Logs/Manual"
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "manual_clean.log")
+
+# Get a logger without automatic cleaning
+logger = get_logger("manual_clean", log_dir=log_dir, clean_logs=False)
+logger.info("First log entry")
+
+# Manually clean the log file later in the program
+if some_condition:
+    clean_log_file(log_file)
+    logger.info("Log file has been manually cleaned")
 ```
 
 ### Complete Scraper Example
@@ -150,9 +189,9 @@ from Scrapper.Modules.BrowserCleanup import ensure_browser_cleanup
 import time
 
 class WebScraper:
-    def __init__(self, name="web_scraper"):
+    def __init__(self, name="web_scraper", clean_logs=True):
         # Set up logging first
-        self.logger = get_logger(name)
+        self.logger = get_logger(name, clean_logs=clean_logs)
         self.logger.info("Initializing web scraper")
         
         # Set up browser
@@ -216,7 +255,8 @@ class WebScraper:
 
 # Usage
 if __name__ == "__main__":
-    scraper = WebScraper("example_scraper")
+    # Use clean_logs=False to preserve log history across runs
+    scraper = WebScraper("example_scraper", clean_logs=False)
     try:
         result = scraper.scrape("https://example.com")
         if result:
@@ -228,12 +268,12 @@ if __name__ == "__main__":
 ### Rotating Log Files
 
 ```python
-from Scrapper.Modules.SetupLogger import get_logger
+from Scrapper.Modules.SetupLogger import get_logger, clean_log_file
 import logging
 from logging.handlers import RotatingFileHandler
 import os
 
-def get_rotating_logger(name, max_bytes=1048576, backup_count=5):
+def get_rotating_logger(name, max_bytes=1048576, backup_count=5, clean_logs=True):
     """
     Get a logger with rotating file handler.
     
@@ -241,12 +281,13 @@ def get_rotating_logger(name, max_bytes=1048576, backup_count=5):
         name: Logger name and log file base name
         max_bytes: Maximum log file size before rotation
         backup_count: Number of backup files to keep
+        clean_logs: Whether to clean log files on startup
         
     Returns:
         Configured logger with rotating file handler
     """
     # Get a basic logger first
-    logger = get_logger(name)
+    logger = get_logger(name, clean_logs=clean_logs)
     
     # Get the log file path from the existing logger
     log_file = None
@@ -279,9 +320,21 @@ def get_rotating_logger(name, max_bytes=1048576, backup_count=5):
     return logger
 
 # Usage
-logger = get_rotating_logger("scraper_with_rotation", max_bytes=5120, backup_count=3)
+logger = get_rotating_logger("scraper_with_rotation", max_bytes=5120, backup_count=3, clean_logs=True)
 logger.info("This log will rotate when it exceeds 5 KB")
 ```
+
+## Configuration
+
+The module supports the following configuration options, which can be set in the ConfigManager:
+
+| Config Key | Description | Default Value |
+|------------|-------------|---------------|
+| `logging.level` | The default logging level | `"INFO"` |
+| `logging.format` | The format for log messages | `"%(asctime)s - %(levelname)s - %(message)s"` |
+| `logging.console_output` | Whether to output logs to console | `True` |
+| `logging.file_output` | Whether to output logs to file | `True` |
+| `logging.clean_logs` | Whether to clean existing log files on startup | `True` |
 
 ## Best Practices
 
@@ -290,6 +343,10 @@ logger.info("This log will rotate when it exceeds 5 KB")
 3. **Contextual Information**: Include relevant context in log messages
 4. **Error Details**: Log full exception information for errors
 5. **Consistent Naming**: Use consistent logger naming conventions
+6. **Log Cleaning Strategy**: Use appropriate log cleaning settings for your application:
+   - Set `clean_logs=True` for development to start with clean logs
+   - Set `clean_logs=False` for production to preserve log history
+   - Consider rotating log files for long-running applications
 
 ## Log Levels
 
@@ -304,4 +361,5 @@ logger.info("This log will rotate when it exceeds 5 KB")
 - **No Log Output**: Ensure the log level is not set too high
 - **Missing Log Directory**: Verify that the module has write permissions
 - **Duplicate Log Entries**: Check for multiple handlers with the same output
-- **Performance Issues**: Reduce log verbosity in production environments 
+- **Performance Issues**: Reduce log verbosity in production environments
+- **Log Cleaning Not Working**: Ensure the `clean_logs` parameter is correctly set and that the logger has permissions to modify the file 
