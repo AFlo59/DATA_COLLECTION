@@ -596,30 +596,60 @@ def download_book_as_markdown(driver: Any, book: BookMetadata) -> bool:
     try:
         # Create safe filename for the download
         year = book.publication_date.split("-")[0] if "-" in book.publication_date else ""
-        safe_name = sanitize_filename(f"{book.name}_{year}")
-        download_path = os.path.join("Data", "Books", f"{safe_name}.md")
-        book.download_path = download_path
         
-        # Vérifier d'abord si le fichier existe déjà dans le dossier cible
-        if os.path.exists(download_path):
-            logger.info(f"File already exists at {download_path}, marking as downloaded")
-            book.download_success = True
-            return True
+        # Générer deux formats possibles de noms de fichiers
+        safe_name_underscore = sanitize_filename(f"{book.name}_{year}")
+        safe_name_parentheses = sanitize_filename(f"{book.name} ({year})")
+        
+        # Différentes possibilités de chemins de fichiers
+        possible_filenames = [
+            f"{safe_name_underscore}.md",
+            f"{safe_name_parentheses}.md",
+            f"{sanitize_filename(book.name)}.md"
+        ]
+        
+        # Chemin de base pour les livres
+        books_dir = os.path.join("Data", "Books")
+        absolute_books_dir = os.path.abspath(books_dir)
+        
+        # Vérifier si un des fichiers existe déjà
+        logger.info(f"Checking for existing files with possible names:")
+        for filename in possible_filenames:
+            filepath = os.path.join(books_dir, filename)
+            abs_filepath = os.path.join(absolute_books_dir, filename)
+            logger.info(f"  - Checking: {abs_filepath}")
             
-        # Vérifier également dans le dossier de téléchargement par défaut
-        default_download_folder = get_windows_download_folder()
-        default_path = os.path.join(default_download_folder, f"{safe_name}.md")
-        if os.path.exists(default_path):
-            logger.info(f"File already exists in default download folder: {default_path}")
-            logger.info(f"Copying to: {download_path}")
-            try:
-                # S'assurer que le dossier de destination existe
-                os.makedirs(os.path.dirname(download_path), exist_ok=True)
-                shutil.copy2(default_path, download_path)
+            if os.path.exists(filepath) or os.path.exists(abs_filepath):
+                existing_path = abs_filepath if os.path.exists(abs_filepath) else filepath
+                logger.info(f"File already exists at {existing_path}, marking as downloaded")
+                book.download_path = existing_path
                 book.download_success = True
                 return True
-            except Exception as e:
-                logger.warning(f"Failed to copy existing file: {e}")
+        
+        # Si aucun des fichiers n'a été trouvé, utiliser le format avec parenthèses
+        # car c'est celui qui semble être actuellement utilisé
+        download_path = os.path.normpath(os.path.join(books_dir, f"{safe_name_parentheses}.md"))
+        book.download_path = download_path
+        
+        # Vérifier également dans le dossier de téléchargement par défaut
+        default_download_folder = get_windows_download_folder()
+        
+        # Vérifier chaque format dans le dossier de téléchargement par défaut
+        for filename in possible_filenames:
+            default_path = os.path.join(default_download_folder, filename)
+            logger.info(f"Checking default downloads for: {default_path}")
+            
+            if os.path.exists(default_path):
+                logger.info(f"File already exists in default download folder: {default_path}")
+                logger.info(f"Copying to: {download_path}")
+                try:
+                    # S'assurer que le dossier de destination existe
+                    os.makedirs(os.path.dirname(download_path), exist_ok=True)
+                    shutil.copy2(default_path, download_path)
+                    book.download_success = True
+                    return True
+                except Exception as e:
+                    logger.warning(f"Failed to copy existing file: {e}")
         
         # Si le fichier n'existe pas, procéder au téléchargement
         logger.info(f"File not found, proceeding with download to: {download_path}")
@@ -651,11 +681,17 @@ def download_book_as_markdown(driver: Any, book: BookMetadata) -> bool:
         # Attendre un peu plus pour s'assurer que tout est chargé
         time.sleep(5)
         
-        # Vérifier à nouveau si le fichier est apparu après navigation
-        if os.path.exists(download_path):
-            logger.info(f"File appeared at {download_path}, no need to download")
-            book.download_success = True
-            return True
+        # Vérifier à nouveau si l'un des fichiers possibles est apparu après navigation
+        for filename in possible_filenames:
+            filepath = os.path.join(books_dir, filename)
+            abs_filepath = os.path.join(absolute_books_dir, filename)
+            
+            if os.path.exists(filepath) or os.path.exists(abs_filepath):
+                existing_path = abs_filepath if os.path.exists(abs_filepath) else filepath
+                logger.info(f"File appeared at {existing_path} after navigation, no need to download")
+                book.download_path = existing_path
+                book.download_success = True
+                return True
         
         # 4. Cliquer sur le bouton d'options
         logger.info("Clicking options button...")
@@ -818,26 +854,49 @@ def download_book_as_markdown(driver: Any, book: BookMetadata) -> bool:
         start_time = time.time()
         max_check_time = 60  # Attendre maximum 60 secondes
         
+        # Chercher le fichier dans plusieurs endroits, avec différentes variations du chemin
+        possible_paths = []
+        
+        # Ajouter tous les chemins possibles pour tous les formats de noms de fichiers
+        for filename in possible_filenames:
+            # Chemins absolus basés sur le répertoire Data/Books
+            possible_paths.append(os.path.join(absolute_books_dir, filename))
+            # Chemins relatifs basés sur Data/Books
+            possible_paths.append(os.path.join(books_dir, filename))
+            # Chemins dans le répertoire de téléchargement par défaut
+            possible_paths.append(os.path.join(default_download_folder, filename))
+        
+        # Journaliser tous les chemins que nous vérifions
+        logger.info("Checking following paths for downloaded file:")
+        for i, path in enumerate(possible_paths):
+            logger.info(f"  Path {i+1}: {path}")
+        
         while time.time() - start_time < max_check_time:
-            # Vérifier le dossier cible
-            if os.path.exists(download_path) and os.path.getsize(download_path) > 100:
-                logger.info(f"File appeared at {download_path}, download successful")
-                book.download_success = True
-                return True
-                
-            # Vérifier le dossier de téléchargement par défaut
-            if os.path.exists(default_path) and os.path.getsize(default_path) > 100:
-                logger.info(f"File appeared in default download folder: {default_path}")
-                try:
-                    shutil.copy2(default_path, download_path)
-                    logger.info(f"Copied to target location: {download_path}")
-                    book.download_success = True
-                    return True
-                except Exception as e:
-                    logger.error(f"Error copying file: {e}")
-                    book.download_success = True
-                    book.download_path = default_path
-                    return True
+            # Vérifier toutes les variations de chemins
+            for path in possible_paths:
+                if os.path.exists(path):
+                    file_size = os.path.getsize(path)
+                    if file_size > 100:  # S'assurer que le fichier n'est pas vide
+                        logger.info(f"File found at {path} ({file_size} bytes)")
+                        
+                        # Si ce n'est pas le chemin cible, copier le fichier
+                        if not path.startswith(absolute_books_dir) and not path.startswith(books_dir):
+                            try:
+                                logger.info(f"Copying from {path} to {download_path}")
+                                # S'assurer que le répertoire existe
+                                os.makedirs(os.path.dirname(download_path), exist_ok=True)
+                                shutil.copy2(path, download_path)
+                                book.download_path = download_path
+                            except Exception as e:
+                                logger.error(f"Error copying file: {e}")
+                                # Utiliser le chemin où le fichier a été trouvé
+                                book.download_path = path
+                        else:
+                            book.download_path = path
+                        
+                        book.download_success = True
+                        logger.info(f"Successfully downloaded: {book.name}")
+                        return True
             
             # Pause brève avant la prochaine vérification
             time.sleep(2)
@@ -846,8 +905,53 @@ def download_book_as_markdown(driver: Any, book: BookMetadata) -> bool:
             elapsed = time.time() - start_time
             if int(elapsed) % 10 == 0:
                 logger.info(f"Still waiting for file to appear... ({int(elapsed)}s elapsed)")
+                # Liste les fichiers dans le répertoire cible pour débogage
+                if os.path.exists(absolute_books_dir):
+                    files = os.listdir(absolute_books_dir)
+                    logger.info(f"Files in {absolute_books_dir}: {files}")
+                # Liste les fichiers dans le répertoire de téléchargement par défaut
+                if os.path.exists(default_download_folder):
+                    default_files = [f for f in os.listdir(default_download_folder) if f.endswith('.md')]
+                    if default_files:
+                        logger.info(f"MD files in default download folder: {default_files}")
         
         logger.warning(f"Download timeout after {max_check_time} seconds")
+        
+        # Faire une dernière vérification plus approfondie
+        logger.info("Performing final deep search for downloaded file...")
+        
+        # Dernier effort: vérifier si des fichiers MD existent dans les répertoires et contiennent le nom du livre
+        target_dirs = [books_dir, absolute_books_dir, default_download_folder]
+        book_name_lower = book.name.lower()
+        
+        for target_dir in target_dirs:
+            if not os.path.exists(target_dir):
+                continue
+                
+            try:
+                md_files = [f for f in os.listdir(target_dir) if f.endswith('.md')]
+                for md_file in md_files:
+                    # Si le nom du fichier contient le nom du livre, c'est probablement ce que nous cherchons
+                    if book_name_lower in md_file.lower():
+                        file_path = os.path.join(target_dir, md_file)
+                        logger.info(f"Found probable match by book name: {file_path}")
+                        
+                        if target_dir != absolute_books_dir and target_dir != books_dir:
+                            try:
+                                # Copier vers le répertoire cible
+                                shutil.copy2(file_path, download_path)
+                                book.download_path = download_path
+                            except Exception as e:
+                                logger.error(f"Error copying file: {e}")
+                                book.download_path = file_path
+                        else:
+                            book.download_path = file_path
+                        
+                        book.download_success = True
+                        return True
+            except Exception as e:
+                logger.warning(f"Error checking directory {target_dir}: {e}")
+        
         return False
             
     except Exception as e:
@@ -1206,17 +1310,26 @@ def process_book_one_by_one(driver: Any, wait: WebDriverWait, books_data: BooksD
                     
                     # Vérifier si ce livre a déjà été traité
                     book_url = current_book.get_attribute('href')
-                    if any(book.url == book_url for book in books_data.books):
-                        logger.info(f"Book {i+1}/{total_books} already processed, skipping")
-                        continue
                     
-                    # Extraire les métadonnées
+                    # Extraire d'abord les métadonnées pour faire une vérification plus précise
                     metadata = extract_book_metadata(current_book, driver)
                     if not metadata:
                         logger.warning(f"Could not extract metadata for book {i+1}, skipping")
                         continue
                     
                     logger.info(f"Extracted metadata for book: {metadata.name} ({metadata.type})")
+                    
+                    # Vérifier si ce livre (nom et date) existe déjà dans les métadonnées
+                    similar_book_exists = False
+                    for existing_book in books_data.books:
+                        # Vérifier le nom ET la date de publication
+                        if existing_book.name == metadata.name and existing_book.publication_date == metadata.publication_date:
+                            logger.info(f"Book '{metadata.name}' ({metadata.publication_date}) already processed, skipping")
+                            similar_book_exists = True
+                            break
+                    
+                    if similar_book_exists:
+                        continue
                     
                     # 2. Cliquer sur le livre et télécharger
                     success = download_book_as_markdown(driver, metadata)
@@ -1225,7 +1338,30 @@ def process_book_one_by_one(driver: Any, wait: WebDriverWait, books_data: BooksD
                     if success:
                         logger.info(f"Successfully downloaded book: {metadata.name}")
                     else:
-                        logger.warning(f"Failed to download book: {metadata.name}")
+                        # Vérifier si le fichier existe déjà mais n'a pas été détecté par la fonction de téléchargement
+                        year = metadata.publication_date.split("-")[0] if "-" in metadata.publication_date else ""
+                        target_dir = os.path.join("Data", "Books")
+                        
+                        # Vérifier toutes les variations possibles du nom de fichier
+                        patterns = [
+                            f"{metadata.name}_{year}.md",
+                            f"{metadata.name} ({year}).md",
+                            f"{metadata.name}.md"
+                        ]
+                        
+                        for pattern in patterns:
+                            file_path = os.path.join(target_dir, pattern)
+                            abs_file_path = os.path.abspath(file_path)
+                            
+                            if os.path.exists(abs_file_path):
+                                logger.info(f"Found existing file with pattern: {abs_file_path}")
+                                metadata.download_path = abs_file_path
+                                metadata.download_success = True
+                                success = True
+                                break
+                        
+                        if not success:
+                            logger.warning(f"Failed to download book: {metadata.name} and no existing file found")
                     
                     # Ajouter aux données et sauvegarder
                     books_data.books.append(metadata)
