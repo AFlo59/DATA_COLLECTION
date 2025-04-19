@@ -277,106 +277,63 @@ def extract_species_metadata(driver: Any, wait: WebDriverWait) -> List[SpecieBas
         )
         logger.info("Species list loaded, extracting metadata...")
         
-        # Désactiver tous les filtres un par un en passant chaque data-state en ignore
-        logger.info("Disabling all filters by setting each data-state to ignore...")
+        # Disable filters one by one with clicks
+        logger.info("Disabling all filters one by one...")
         try:
-            # Script JavaScript pour désactiver tous les filtres
-            disable_filters_script = """
-            // Fonction pour désactiver tous les filtres
-            function disableAllFilters() {
-                // Désactiver tous les éléments avec un attribut data-state
-                const filterElements = document.querySelectorAll('[data-state]');
-                filterElements.forEach(el => {
-                    el.setAttribute('data-state', 'ignore');
-                });
-                
-                // Cliquer sur les boutons "Reset"
-                const resetButtons = document.querySelectorAll('button.fltr__btn-reset');
-                resetButtons.forEach(btn => {
-                    btn.click();
-                });
-                
-                // Cliquer sur les boutons "All"
-                const allButtons = document.querySelectorAll('button.fltr__h-btn--all');
-                allButtons.forEach(btn => {
-                    btn.click();
-                });
-                
-                // Désactiver les options de source
-                const sourceCheckboxes = document.querySelectorAll('.fltr__src-yes');
-                sourceCheckboxes.forEach(cb => {
-                    if (cb.checked) {
-                        cb.click();
-                    }
-                });
-                
-                // Cliquer sur les liens "Select All/None"
-                const allNoneLinks = document.querySelectorAll('a.fltr__h-click-all, a.fltr__h-click-none');
-                const allLinks = [...allNoneLinks].filter(a => a.textContent.includes('All'));
-                allLinks.forEach(a => {
-                    a.click();
-                });
-                
-                // Pour les boutons radio, sélectionner "Any"
-                const anyRadios = document.querySelectorAll('input[type="radio"][value="*"]');
-                anyRadios.forEach(radio => {
-                    radio.click();
-                });
-                
-                // Retourner le nombre de filtres trouvés
-                return {
-                    dataState: filterElements.length,
-                    resetButtons: resetButtons.length,
-                    allButtons: allButtons.length,
-                    sourceCheckboxes: sourceCheckboxes.length,
-                    allLinks: allLinks.length,
-                    anyRadios: anyRadios.length
-                };
-            }
+            # Find all filter elements with data-state attribute
+            filter_elements = driver.find_elements(By.CSS_SELECTOR, "[data-state]")
+            for element in filter_elements:
+                try:
+                    current_state = element.get_attribute("data-state")
+                    if current_state != "ignore":
+                        logger.info(f"Clicking filter element to disable: {element.text}")
+                        driver.execute_script("arguments[0].click();", element)
+                        time.sleep(0.3)  # Small delay to let the JavaScript react
+                except Exception as e:
+                    logger.warning(f"Error disabling single filter element: {e}")
             
-            // Exécuter et retourner les résultats
-            return disableAllFilters();
-            """
-            
-            # Exécuter le script
-            result = driver.execute_script(disable_filters_script)
-            logger.info(f"Disabled filters: {result}")
-            
-            # Donner du temps au JavaScript pour actualiser la page
-            time.sleep(3)
-            
-            # Désactiver explicitement les filtres un par un si nécessaire
+            # Click all reset filter buttons
             filter_buttons = driver.find_elements(By.CSS_SELECTOR, "button.fltr__btn-reset")
             for button in filter_buttons:
                 try:
+                    logger.info("Clicking filter reset button")
                     driver.execute_script("arguments[0].click();", button)
-                    logger.info("Reset filter button clicked")
-                    time.sleep(0.5)  # Petit délai pour laisser le temps au JavaScript de réagir
+                    time.sleep(0.3)  # Small delay to let the JavaScript react
                 except Exception as e:
                     logger.warning(f"Error clicking filter reset button: {e}")
             
-            # Désactiver les sources (bouton "All")
+            # Click all "All" buttons for sources
             source_all_buttons = driver.find_elements(By.CSS_SELECTOR, "button.fltr__h-btn--all")
             for button in source_all_buttons:
                 try:
+                    logger.info("Clicking 'All sources' button")
                     driver.execute_script("arguments[0].click();", button)
-                    logger.info("'All sources' button clicked")
-                    time.sleep(0.5)
+                    time.sleep(0.3)
                 except Exception as e:
                     logger.warning(f"Error clicking 'All sources' button: {e}")
                     
-            # Désactiver les autres filtres qui pourraient être présents
+            # Click any "Select All" links
+            select_all_links = driver.find_elements(By.CSS_SELECTOR, "a.fltr__h-click-all")
+            for link in select_all_links:
+                try:
+                    logger.info("Clicking 'Select All' link")
+                    driver.execute_script("arguments[0].click();", link)
+                    time.sleep(0.3)
+                except Exception as e:
+                    logger.warning(f"Error clicking 'Select All' link: {e}")
+            
+            # Click any general "Reset filters" or "Clear filters" buttons
             other_filter_buttons = driver.find_elements(By.CSS_SELECTOR, "button.col-12")
             for button in other_filter_buttons:
                 if "Reset filters" in button.text or "Clear filters" in button.text:
                     try:
+                        logger.info(f"Clicking filter button: {button.text}")
                         driver.execute_script("arguments[0].click();", button)
-                        logger.info(f"Filter button clicked: {button.text}")
-                        time.sleep(0.5)
+                        time.sleep(0.3)
                     except Exception as e:
                         logger.warning(f"Error clicking filter button: {e}")
                         
-            # Attendre que la liste se mette à jour
+            # Wait for the list to update
             time.sleep(2)
         except Exception as e:
             logger.warning(f"Error disabling filters: {e}")
@@ -439,153 +396,175 @@ def extract_traits_data(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
         # Wait for traits content to load
         logger.info("Extracting traits data...")
         
-        # Attendre que la page soit chargée
+        # Wait for the page content table to load
         wait.until(EC.presence_of_element_located((By.ID, "pagecontent")))
         
-        # Récupérer l'élément de page principal
+        # Get the main page content table
         page_content = driver.find_element(By.ID, "pagecontent")
         
-        # 1. Extraire les données de l'en-tête (nom, source, etc.)
+        # Start by extracting the name and source from the table header
         try:
-            header_info = {}
-            header = page_content.find_element(By.TAG_NAME, "th")
+            # Extract from the header th element
+            header = page_content.find_element(By.CSS_SELECTOR, "th.stats__th-name")
             
-            # Nom et source depuis les attributs data-*
+            # Get name from data attribute or from h1 element
             if header.get_attribute("data-name"):
-                header_info["full_name"] = header.get_attribute("data-name")
-            if header.get_attribute("data-source"):
-                header_info["source_code"] = header.get_attribute("data-source")
+                traits["name"] = header.get_attribute("data-name")
+            else:
+                name_elem = header.find_element(By.CSS_SELECTOR, "h1.stats__h-name")
+                traits["name"] = name_elem.text.strip()
                 
-            # Extraire les liens vers la source (livre)
+            # Get source from data attribute
+            if header.get_attribute("data-source"):
+                traits["source_code"] = header.get_attribute("data-source")
+                
+            # Get source and page info from links
             source_links = header.find_elements(By.CSS_SELECTOR, "a.stats__h-source-abbreviation, a.rd__stats-name-page")
             for link in source_links:
                 if "page" in link.get_attribute("class"):
-                    header_info["page"] = link.text.strip()
+                    traits["page"] = link.text.strip()
                 elif "source" in link.get_attribute("class"):
-                    header_info["source_abbr"] = link.text.strip()
+                    traits["source_abbr"] = link.text.strip()
                     if link.get_attribute("title"):
-                        header_info["source_full"] = link.get_attribute("title")
-            
-            # Fusionner ces infos dans les traits
-            traits.update(header_info)
-            logger.debug("Extracted header information")
-        except Exception as e:
-            logger.warning(f"Failed to extract header information: {e}")
-        
-        # 2. Extraire les attributs de base (Ability Scores, Size, etc.) depuis la liste ul
-        try:
-            basic_info = {}
-            ul_elements = page_content.find_elements(By.CSS_SELECTOR, "ul.rd__list-hang-notitle li")
-            
-            for li in ul_elements:
-                try:
-                    # Récupérer le nom et la valeur
-                    name_elem = li.find_element(By.CSS_SELECTOR, "span.bold, span.rd__list-item-name")
-                    name = name_elem.text.strip().rstrip(':')
-                    
-                    # Obtenir le texte complet puis enlever le nom pour avoir la valeur
-                    full_text = li.text.strip()
-                    if name in full_text:
-                        value = full_text[full_text.find(name) + len(name):].strip()
-                        if value.startswith(':'):
-                            value = value[1:].strip()
+                        traits["source_full"] = link.get_attribute("title")
                         
-                        basic_info[name] = value
-                        logger.debug(f"Extracted basic trait: {name}")
-                except Exception as e:
-                    logger.warning(f"Failed to extract basic trait item: {e}")
-            
-            # Ajouter ces infos de base
-            traits.update(basic_info)
+            logger.debug(f"Extracted header information for {traits.get('name', 'Unknown')}")
         except Exception as e:
-            logger.warning(f"Failed to extract basic info list: {e}")
-        
-        # 3. Extraire tous les traits détaillés des div.rd__b--3
-        try:
-            # Trouver toutes les sections de traits
-            trait_divs = page_content.find_elements(By.CSS_SELECTOR, "div.rd__b div.rd__b--3")
+            logger.warning(f"Error extracting header: {e}")
+            logger.debug(traceback.format_exc())
             
-            for div in trait_divs:
-                try:
-                    # Récupérer le nom du trait de différentes façons
-                    title = None
-                    
-                    # Méthode 1: chercher l'élément span.entry-title-inner
-                    try:
-                        title_element = div.find_element(By.CSS_SELECTOR, "span.entry-title-inner")
-                        title = title_element.text.strip()
-                    except:
-                        pass
-                    
-                    # Méthode 2: utiliser l'attribut data-roll-name-ancestor
-                    if not title:
-                        try:
-                            title = div.get_attribute("data-roll-name-ancestor")
-                        except:
-                            pass
-                    
-                    # Si on a trouvé un titre
-                    if title:
-                        # Récupérer tous les paragraphes
-                        paragraphs = div.find_elements(By.TAG_NAME, "p")
-                        description = "\n".join([p.text.strip() for p in paragraphs])
-                        
-                        # Ajouter au dictionnaire des traits
-                        traits[title] = description
-                        logger.debug(f"Extracted trait: {title}")
-                except Exception as e:
-                    logger.warning(f"Failed to extract individual trait: {e}")
-        except Exception as e:
-            logger.warning(f"Failed to extract detailed traits: {e}")
+        # Extract all rows from the table
+        rows = page_content.find_elements(By.TAG_NAME, "tr")
+        logger.debug(f"Found {len(rows)} rows in the table")
         
-        # 4. Extraire des informations supplémentaires (ex: ability scores) de la racine de la page
-        try:
-            # Chercher les div.rd__b--1 et div.rd__b--2 qui peuvent contenir des informations importantes
-            ability_divs = page_content.find_elements(By.CSS_SELECTOR, "div.rd__b--1, div.rd__b--2")
-            for div in ability_divs:
-                text = div.text.strip()
-                
-                # Analyser le texte pour déterminer quel type d'information il contient
-                if "Ability Score" in text:
-                    traits["Ability Score Increase"] = text
-                    logger.debug("Extracted Ability Score Increase")
-                # Ajouter d'autres conditions au besoin
-        except Exception as e:
-            logger.warning(f"Failed to extract additional information: {e}")
-        
-        # 5. Extraire toutes les autres balises tr de la table pagecontent
-        try:
-            # Trouver toutes les lignes de la table
-            rows = page_content.find_elements(By.TAG_NAME, "tr")
-            
-            for i, row in enumerate(rows):
-                # Ignorer les lignes d'en-tête que nous avons déjà traitées
-                if i < 2:  # Généralement les 2 premières lignes
-                    continue
-                
-                # Vérifier si la ligne contient des données utiles
-                cells = row.find_elements(By.TAG_NAME, "td")
-                if cells:
-                    for cell in cells:
-                        text = cell.text.strip()
-                        if text and "Source:" not in text and len(text) > 5:  # Éviter les cellules vides ou inutiles
-                            # Ajouter comme information supplémentaire numérotée
-                            key = f"Additional_Info_{i}"
-                            traits[key] = text
-                            logger.debug(f"Extracted additional row data: {key}")
-            
-        except Exception as e:
-            logger.warning(f"Failed to extract table rows: {e}")
-        
-        # Si aucun trait n'a été trouvé, capturer tout le contenu de la page comme fallback
-        if not traits:
+        # Process each row in the table
+        for row_index, row in enumerate(rows):
             try:
-                content = page_content.text.strip()
-                traits["full_page_content"] = content
-                logger.debug("Captured full page content as fallback")
+                # Skip the header rows (usually first 1-2 rows)
+                if row_index < 2:
+                    continue
+                    
+                # Get all cells in this row
+                cells = row.find_elements(By.TAG_NAME, "td")
+                
+                # Skip rows with no cells
+                if not cells:
+                    continue
+                    
+                # Process cells - each cell could contain different types of data
+                for cell in cells:
+                    # If the cell has a colspan attribute, it likely contains important information
+                    if cell.get_attribute("colspan"):
+                        # Check for basic traits list (usually in ul elements)
+                        ul_elements = cell.find_elements(By.CSS_SELECTOR, "ul.rd__list-hang-notitle li")
+                        for li_index, li in enumerate(ul_elements):
+                            try:
+                                # Get the trait name and value
+                                name_elem = li.find_element(By.CSS_SELECTOR, "span.bold, span.rd__list-item-name")
+                                name = name_elem.text.strip().rstrip(':')
+                                
+                                # Get full text then extract the value by removing the name
+                                full_text = li.text.strip()
+                                if name in full_text:
+                                    value = full_text[full_text.find(name) + len(name):].strip()
+                                    if value.startswith(':'):
+                                        value = value[1:].strip()
+                                        
+                                    traits[name] = value
+                                    logger.debug(f"Extracted basic trait: {name} = {value}")
+                            except Exception as e:
+                                logger.warning(f"Error processing list item {li_index}: {e}")
+                        
+                        # Extract detailed traits from div elements
+                        trait_divs = cell.find_elements(By.CSS_SELECTOR, "div.rd__b div.rd__b--3, div.rd__b--2 div, div.rd__b")
+                        for div_index, div in enumerate(trait_divs):
+                            try:
+                                # Try different methods to get the trait title
+                                title = None
+                                
+                                # Method 1: From entry-title-inner span
+                                try:
+                                    title_elem = div.find_element(By.CSS_SELECTOR, "span.entry-title-inner, span.rd__h")
+                                    title = title_elem.text.strip()
+                                except:
+                                    pass
+                                    
+                                # Method 2: From data attribute
+                                if not title:
+                                    try:
+                                        title = div.get_attribute("data-roll-name-ancestor")
+                                    except:
+                                        pass
+                                        
+                                # Method 3: From first bold element
+                                if not title:
+                                    try:
+                                        bold_elems = div.find_elements(By.CSS_SELECTOR, "span.bold, b")
+                                        if bold_elems:
+                                            title = bold_elems[0].text.strip().rstrip('.')
+                                    except:
+                                        pass
+                                
+                                # If we found a title, extract the description from paragraphs
+                                if title:
+                                    # Get all paragraphs
+                                    paragraphs = div.find_elements(By.TAG_NAME, "p")
+                                    descriptions = []
+                                    
+                                    for p in paragraphs:
+                                        try:
+                                            # Check if paragraph has dice rollers or other elements
+                                            rollers = p.find_elements(By.CSS_SELECTOR, "span.roller")
+                                            
+                                            if rollers:
+                                                # Get the text including dice values
+                                                p_text = p.text.strip()
+                                                for roller in rollers:
+                                                    # Add dice value from data attribute if available
+                                                    dice_value = roller.get_attribute("data-packed-dice")
+                                                    if dice_value and "toRoll" in dice_value:
+                                                        import json
+                                                        try:
+                                                            dice_data = json.loads(dice_value)
+                                                            if "toRoll" in dice_data:
+                                                                p_text = p_text.replace(roller.text, dice_data["toRoll"])
+                                                        except:
+                                                            pass
+                                                            
+                                                descriptions.append(p_text)
+                                            else:
+                                                descriptions.append(p.text.strip())
+                                        except Exception as e:
+                                            logger.warning(f"Error processing paragraph: {e}")
+                                            descriptions.append(p.text.strip())
+                                    
+                                    # Join all paragraph texts
+                                    trait_description = "\n".join(descriptions)
+                                    
+                                    # Store the trait
+                                    if title and trait_description:
+                                        traits[title] = trait_description
+                                        logger.debug(f"Extracted trait: {title}")
+                                    elif title:
+                                        # If no paragraphs, get the full text
+                                        traits[title] = div.text.strip()
+                                        logger.debug(f"Extracted trait with full text: {title}")
+                            except Exception as e:
+                                logger.warning(f"Error processing trait div {div_index}: {e}")
+                        
+                        # If there are no proper sections, capture all the text as a fallback
+                        if not traits and cell.text.strip():
+                            traits["raw_content"] = cell.text.strip()
+                            logger.debug("Captured cell text as fallback")
             except Exception as e:
-                logger.error(f"Failed to capture page content: {e}")
-        
+                logger.warning(f"Error processing row {row_index}: {e}")
+                logger.debug(traceback.format_exc())
+                
+        # If no traits were found, capture the entire table content as fallback
+        if not traits:
+            logger.warning("No structured traits found, capturing full page content as fallback")
+            traits["full_page_content"] = page_content.text.strip()
+            
         logger.info(f"Extracted {len(traits)} traits in total")
         return traits
     except Exception as e:
