@@ -453,6 +453,14 @@ def extract_traits_data(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
                     
                 # Process cells - each cell could contain different types of data
                 for cell in cells:
+                    # Special handling for source info in the last row
+                    if "Source:" in cell.text:
+                        source_text = cell.text.strip()
+                        if source_text and "Source:" in source_text:
+                            traits["source_full_text"] = source_text
+                            logger.debug(f"Extracted source text: {source_text}")
+                        continue
+                        
                     # If the cell has a colspan attribute, it likely contains important information
                     if cell.get_attribute("colspan"):
                         # Check for basic traits list (usually in ul elements)
@@ -475,27 +483,36 @@ def extract_traits_data(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
                             except Exception as e:
                                 logger.warning(f"Error processing list item {li_index}: {e}")
                         
-                        # Extract detailed traits from div elements
-                        trait_divs = cell.find_elements(By.CSS_SELECTOR, "div.rd__b div.rd__b--3, div.rd__b--2 div, div.rd__b")
+                        # Extract detailed traits from div elements - now handling nested divs better
+                        try:
+                            # First try to get the main container div which often contains all traits
+                            main_div = cell.find_element(By.CSS_SELECTOR, "div.rd__b--2")
+                            trait_divs = main_div.find_elements(By.CSS_SELECTOR, "div.rd__b--3")
+                            logger.debug(f"Found {len(trait_divs)} trait divs in main container")
+                        except:
+                            # Fallback: get all potential trait divs directly from the cell
+                            trait_divs = cell.find_elements(By.CSS_SELECTOR, "div.rd__b div.rd__b--3, div.rd__b--2 div, div.rd__b")
+                            logger.debug(f"Found {len(trait_divs)} trait divs using fallback method")
+                        
                         for div_index, div in enumerate(trait_divs):
                             try:
                                 # Try different methods to get the trait title
                                 title = None
                                 
-                                # Method 1: From entry-title-inner span
+                                # Method 1: From data-roll-name-ancestor attribute
                                 try:
-                                    title_elem = div.find_element(By.CSS_SELECTOR, "span.entry-title-inner, span.rd__h")
-                                    title = title_elem.text.strip()
+                                    title = div.get_attribute("data-roll-name-ancestor")
                                 except:
                                     pass
-                                    
-                                # Method 2: From data attribute
+                                
+                                # Method 2: From entry-title-inner span
                                 if not title:
                                     try:
-                                        title = div.get_attribute("data-roll-name-ancestor")
+                                        title_elem = div.find_element(By.CSS_SELECTOR, "span.entry-title-inner, span.rd__h")
+                                        title = title_elem.text.strip()
                                     except:
                                         pass
-                                        
+                                    
                                 # Method 3: From first bold element
                                 if not title:
                                     try:
@@ -507,50 +524,163 @@ def extract_traits_data(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
                                 
                                 # If we found a title, extract the description from paragraphs
                                 if title:
-                                    # Get all paragraphs
+                                    # Process each paragraph to extract text and handle links
                                     paragraphs = div.find_elements(By.TAG_NAME, "p")
                                     descriptions = []
+                                    links_info = []
+                                    hover_spans_info = []
+                                    italic_sections = []
+                                    dice_rollers = []
                                     
-                                    for p in paragraphs:
+                                    for p_index, p in enumerate(paragraphs):
                                         try:
-                                            # Check if paragraph has dice rollers or other elements
-                                            rollers = p.find_elements(By.CSS_SELECTOR, "span.roller")
+                                            # Extract italic text sections
+                                            italic_elems = p.find_elements(By.CSS_SELECTOR, "i")
+                                            for italic_index, italic in enumerate(italic_elems):
+                                                try:
+                                                    italic_text = italic.text.strip()
+                                                    if italic_text:
+                                                        italic_info = {
+                                                            "text": italic_text,
+                                                            "paragraph": p_index,
+                                                            "index": italic_index
+                                                        }
+                                                        italic_sections.append(italic_info)
+                                                        logger.debug(f"Extracted italic text: {italic_text[:30]}...")
+                                                except Exception as e:
+                                                    logger.warning(f"Error processing italic text {italic_index}: {e}")
                                             
-                                            if rollers:
-                                                # Get the text including dice values
-                                                p_text = p.text.strip()
-                                                for roller in rollers:
-                                                    # Add dice value from data attribute if available
-                                                    dice_value = roller.get_attribute("data-packed-dice")
-                                                    if dice_value and "toRoll" in dice_value:
-                                                        import json
-                                                        try:
-                                                            dice_data = json.loads(dice_value)
-                                                            if "toRoll" in dice_data:
-                                                                p_text = p_text.replace(roller.text, dice_data["toRoll"])
-                                                        except:
-                                                            pass
+                                            # Get all links in the paragraph
+                                            links = p.find_elements(By.TAG_NAME, "a")
+                                            p_text = p.text.strip()
+                                            
+                                            # If there are links, extract their info
+                                            if links:
+                                                for link_index, link in enumerate(links):
+                                                    try:
+                                                        link_text = link.text.strip()
+                                                        link_href = link.get_attribute("href")
+                                                        link_data = {
+                                                            "text": link_text,
+                                                            "href": link_href,
+                                                            "paragraph": p_index,
+                                                            "title": title
+                                                        }
+                                                        
+                                                        # Add additional attributes if available
+                                                        if link.get_attribute("data-vet-page"):
+                                                            link_data["type"] = link.get_attribute("data-vet-page").replace(".html", "")
+                                                        if link.get_attribute("data-vet-source"):
+                                                            link_data["source"] = link.get_attribute("data-vet-source")
                                                             
-                                                descriptions.append(p_text)
-                                            else:
-                                                descriptions.append(p.text.strip())
+                                                        links_info.append(link_data)
+                                                        logger.debug(f"Extracted link: {link_text} -> {link_href}")
+                                                    except Exception as e:
+                                                        logger.warning(f"Error processing link {link_index} in paragraph {p_index}: {e}")
+                                            
+                                            # Extract help-hover spans (for skills, etc.)
+                                            hover_spans = p.find_elements(By.CSS_SELECTOR, "span.help, span.help--hover")
+                                            if hover_spans:
+                                                for span_index, span in enumerate(hover_spans):
+                                                    try:
+                                                        span_text = span.text.strip()
+                                                        span_data = {
+                                                            "text": span_text,
+                                                            "paragraph": p_index,
+                                                            "title": title
+                                                        }
+                                                        
+                                                        # Add data attributes if available
+                                                        for attr in ["data-vet-page", "data-vet-source", "data-vet-hash"]:
+                                                            if span.get_attribute(attr):
+                                                                span_data[attr.replace("data-vet-", "")] = span.get_attribute(attr)
+                                                                
+                                                        hover_spans_info.append(span_data)
+                                                        logger.debug(f"Extracted hover span: {span_text}")
+                                                    except Exception as e:
+                                                        logger.warning(f"Error processing hover span {span_index}: {e}")
+                                            
+                                            # Check if paragraph has dice rollers
+                                            rollers = p.find_elements(By.CSS_SELECTOR, "span.roller")
+                                            if rollers:
+                                                for roller_index, roller in enumerate(rollers):
+                                                    try:
+                                                        roller_text = roller.text.strip()
+                                                        dice_value = roller.get_attribute("data-packed-dice")
+                                                        
+                                                        # Store the roller data
+                                                        roller_data = {
+                                                            "text": roller_text,
+                                                            "paragraph": p_index,
+                                                            "position": roller_index
+                                                        }
+                                                        
+                                                        # Extract and parse the dice info
+                                                        if dice_value:
+                                                            import json
+                                                            try:
+                                                                dice_data = json.loads(dice_value)
+                                                                for key, value in dice_data.items():
+                                                                    roller_data[key] = value
+                                                                
+                                                                # Replace the roller text in the paragraph with the actual dice formula
+                                                                if "toRoll" in dice_data:
+                                                                    p_text = p_text.replace(roller_text, dice_data["toRoll"])
+                                                            except json.JSONDecodeError:
+                                                                roller_data["raw_dice_value"] = dice_value
+                                                            except Exception as e:
+                                                                logger.warning(f"Error parsing dice data: {e}")
+                                                                roller_data["raw_dice_value"] = dice_value
+                                                                
+                                                        dice_rollers.append(roller_data)
+                                                        logger.debug(f"Extracted dice roller: {roller_text}")
+                                                    except Exception as e:
+                                                        logger.warning(f"Error processing dice roller {roller_index}: {e}")
+                                            
+                                            descriptions.append(p_text)
                                         except Exception as e:
-                                            logger.warning(f"Error processing paragraph: {e}")
+                                            logger.warning(f"Error processing paragraph {p_index}: {e}")
+                                            # Fallback: get the raw text
                                             descriptions.append(p.text.strip())
                                     
                                     # Join all paragraph texts
                                     trait_description = "\n".join(descriptions)
                                     
-                                    # Store the trait
+                                    # Store the trait description
                                     if title and trait_description:
                                         traits[title] = trait_description
                                         logger.debug(f"Extracted trait: {title}")
+                                        
+                                        # If we found links, store them
+                                        if links_info:
+                                            links_key = f"{title}_links"
+                                            traits[links_key] = links_info
+                                            logger.debug(f"Stored {len(links_info)} links for trait {title}")
+                                            
+                                        # If we found hover spans, store them
+                                        if hover_spans_info:
+                                            hover_key = f"{title}_hover_spans"
+                                            traits[hover_key] = hover_spans_info
+                                            logger.debug(f"Stored {len(hover_spans_info)} hover spans for trait {title}")
+                                            
+                                        # If we found italic sections, store them
+                                        if italic_sections:
+                                            italic_key = f"{title}_italic_sections"
+                                            traits[italic_key] = italic_sections
+                                            logger.debug(f"Stored {len(italic_sections)} italic sections for trait {title}")
+                                            
+                                        # If we found dice rollers, store them
+                                        if dice_rollers:
+                                            dice_key = f"{title}_dice_rollers"
+                                            traits[dice_key] = dice_rollers
+                                            logger.debug(f"Stored {len(dice_rollers)} dice rollers for trait {title}")
                                     elif title:
                                         # If no paragraphs, get the full text
                                         traits[title] = div.text.strip()
                                         logger.debug(f"Extracted trait with full text: {title}")
                             except Exception as e:
                                 logger.warning(f"Error processing trait div {div_index}: {e}")
+                                logger.debug(traceback.format_exc())
                         
                         # If there are no proper sections, capture all the text as a fallback
                         if not traits and cell.text.strip():
@@ -565,6 +695,9 @@ def extract_traits_data(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
             logger.warning("No structured traits found, capturing full page content as fallback")
             traits["full_page_content"] = page_content.text.strip()
             
+        # Add method used to extract traits - helpful for debugging
+        traits["_extraction_method"] = "structured_table_parser"
+        
         logger.info(f"Extracted {len(traits)} traits in total")
         return traits
     except Exception as e:
