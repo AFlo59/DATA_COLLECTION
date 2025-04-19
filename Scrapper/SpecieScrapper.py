@@ -277,6 +277,111 @@ def extract_species_metadata(driver: Any, wait: WebDriverWait) -> List[SpecieBas
         )
         logger.info("Species list loaded, extracting metadata...")
         
+        # Désactiver tous les filtres un par un en passant chaque data-state en ignore
+        logger.info("Disabling all filters by setting each data-state to ignore...")
+        try:
+            # Script JavaScript pour désactiver tous les filtres
+            disable_filters_script = """
+            // Fonction pour désactiver tous les filtres
+            function disableAllFilters() {
+                // Désactiver tous les éléments avec un attribut data-state
+                const filterElements = document.querySelectorAll('[data-state]');
+                filterElements.forEach(el => {
+                    el.setAttribute('data-state', 'ignore');
+                });
+                
+                // Cliquer sur les boutons "Reset"
+                const resetButtons = document.querySelectorAll('button.fltr__btn-reset');
+                resetButtons.forEach(btn => {
+                    btn.click();
+                });
+                
+                // Cliquer sur les boutons "All"
+                const allButtons = document.querySelectorAll('button.fltr__h-btn--all');
+                allButtons.forEach(btn => {
+                    btn.click();
+                });
+                
+                // Désactiver les options de source
+                const sourceCheckboxes = document.querySelectorAll('.fltr__src-yes');
+                sourceCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        cb.click();
+                    }
+                });
+                
+                // Cliquer sur les liens "Select All/None"
+                const allNoneLinks = document.querySelectorAll('a.fltr__h-click-all, a.fltr__h-click-none');
+                const allLinks = [...allNoneLinks].filter(a => a.textContent.includes('All'));
+                allLinks.forEach(a => {
+                    a.click();
+                });
+                
+                // Pour les boutons radio, sélectionner "Any"
+                const anyRadios = document.querySelectorAll('input[type="radio"][value="*"]');
+                anyRadios.forEach(radio => {
+                    radio.click();
+                });
+                
+                // Retourner le nombre de filtres trouvés
+                return {
+                    dataState: filterElements.length,
+                    resetButtons: resetButtons.length,
+                    allButtons: allButtons.length,
+                    sourceCheckboxes: sourceCheckboxes.length,
+                    allLinks: allLinks.length,
+                    anyRadios: anyRadios.length
+                };
+            }
+            
+            // Exécuter et retourner les résultats
+            return disableAllFilters();
+            """
+            
+            # Exécuter le script
+            result = driver.execute_script(disable_filters_script)
+            logger.info(f"Disabled filters: {result}")
+            
+            # Donner du temps au JavaScript pour actualiser la page
+            time.sleep(3)
+            
+            # Désactiver explicitement les filtres un par un si nécessaire
+            filter_buttons = driver.find_elements(By.CSS_SELECTOR, "button.fltr__btn-reset")
+            for button in filter_buttons:
+                try:
+                    driver.execute_script("arguments[0].click();", button)
+                    logger.info("Reset filter button clicked")
+                    time.sleep(0.5)  # Petit délai pour laisser le temps au JavaScript de réagir
+                except Exception as e:
+                    logger.warning(f"Error clicking filter reset button: {e}")
+            
+            # Désactiver les sources (bouton "All")
+            source_all_buttons = driver.find_elements(By.CSS_SELECTOR, "button.fltr__h-btn--all")
+            for button in source_all_buttons:
+                try:
+                    driver.execute_script("arguments[0].click();", button)
+                    logger.info("'All sources' button clicked")
+                    time.sleep(0.5)
+                except Exception as e:
+                    logger.warning(f"Error clicking 'All sources' button: {e}")
+                    
+            # Désactiver les autres filtres qui pourraient être présents
+            other_filter_buttons = driver.find_elements(By.CSS_SELECTOR, "button.col-12")
+            for button in other_filter_buttons:
+                if "Reset filters" in button.text or "Clear filters" in button.text:
+                    try:
+                        driver.execute_script("arguments[0].click();", button)
+                        logger.info(f"Filter button clicked: {button.text}")
+                        time.sleep(0.5)
+                    except Exception as e:
+                        logger.warning(f"Error clicking filter button: {e}")
+                        
+            # Attendre que la liste se mette à jour
+            time.sleep(2)
+        except Exception as e:
+            logger.warning(f"Error disabling filters: {e}")
+            logger.debug(traceback.format_exc())
+        
         # Find all species elements
         species_elements = driver.find_elements(By.CSS_SELECTOR, "a.lst__row-border")
         logger.info(f"Found {len(species_elements)} species elements")
@@ -334,34 +439,154 @@ def extract_traits_data(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
         # Wait for traits content to load
         logger.info("Extracting traits data...")
         
-        # Look for all trait sections
-        trait_sections = driver.find_elements(By.CSS_SELECTOR, "div.rd__b--3")
+        # Attendre que la page soit chargée
+        wait.until(EC.presence_of_element_located((By.ID, "pagecontent")))
         
-        for section in trait_sections:
-            try:
-                # Get the trait title
-                title_element = section.find_element(By.CSS_SELECTOR, "span.entry-title-inner")
-                title = title_element.text.strip()
-                
-                # Get the trait description
-                desc_elements = section.find_elements(By.TAG_NAME, "p")
-                description = "\n".join([el.text.strip() for el in desc_elements])
-                
-                traits[title] = description
-                logger.debug(f"Extracted trait: {title}")
-            except Exception as e:
-                logger.warning(f"Error extracting individual trait: {e}")
+        # Récupérer l'élément de page principal
+        page_content = driver.find_element(By.ID, "pagecontent")
         
-        # Also grab the ability score adjustment if present
+        # 1. Extraire les données de l'en-tête (nom, source, etc.)
         try:
-            asi_element = driver.find_element(By.CSS_SELECTOR, "div.rd__b--1")
-            if asi_element:
-                asi_text = asi_element.text.strip()
-                traits["Ability Score Increase"] = asi_text
-        except:
-            logger.debug("No ability score increase found")
+            header_info = {}
+            header = page_content.find_element(By.TAG_NAME, "th")
+            
+            # Nom et source depuis les attributs data-*
+            if header.get_attribute("data-name"):
+                header_info["full_name"] = header.get_attribute("data-name")
+            if header.get_attribute("data-source"):
+                header_info["source_code"] = header.get_attribute("data-source")
+                
+            # Extraire les liens vers la source (livre)
+            source_links = header.find_elements(By.CSS_SELECTOR, "a.stats__h-source-abbreviation, a.rd__stats-name-page")
+            for link in source_links:
+                if "page" in link.get_attribute("class"):
+                    header_info["page"] = link.text.strip()
+                elif "source" in link.get_attribute("class"):
+                    header_info["source_abbr"] = link.text.strip()
+                    if link.get_attribute("title"):
+                        header_info["source_full"] = link.get_attribute("title")
+            
+            # Fusionner ces infos dans les traits
+            traits.update(header_info)
+            logger.debug("Extracted header information")
+        except Exception as e:
+            logger.warning(f"Failed to extract header information: {e}")
         
-        logger.info(f"Extracted {len(traits)} traits")
+        # 2. Extraire les attributs de base (Ability Scores, Size, etc.) depuis la liste ul
+        try:
+            basic_info = {}
+            ul_elements = page_content.find_elements(By.CSS_SELECTOR, "ul.rd__list-hang-notitle li")
+            
+            for li in ul_elements:
+                try:
+                    # Récupérer le nom et la valeur
+                    name_elem = li.find_element(By.CSS_SELECTOR, "span.bold, span.rd__list-item-name")
+                    name = name_elem.text.strip().rstrip(':')
+                    
+                    # Obtenir le texte complet puis enlever le nom pour avoir la valeur
+                    full_text = li.text.strip()
+                    if name in full_text:
+                        value = full_text[full_text.find(name) + len(name):].strip()
+                        if value.startswith(':'):
+                            value = value[1:].strip()
+                        
+                        basic_info[name] = value
+                        logger.debug(f"Extracted basic trait: {name}")
+                except Exception as e:
+                    logger.warning(f"Failed to extract basic trait item: {e}")
+            
+            # Ajouter ces infos de base
+            traits.update(basic_info)
+        except Exception as e:
+            logger.warning(f"Failed to extract basic info list: {e}")
+        
+        # 3. Extraire tous les traits détaillés des div.rd__b--3
+        try:
+            # Trouver toutes les sections de traits
+            trait_divs = page_content.find_elements(By.CSS_SELECTOR, "div.rd__b div.rd__b--3")
+            
+            for div in trait_divs:
+                try:
+                    # Récupérer le nom du trait de différentes façons
+                    title = None
+                    
+                    # Méthode 1: chercher l'élément span.entry-title-inner
+                    try:
+                        title_element = div.find_element(By.CSS_SELECTOR, "span.entry-title-inner")
+                        title = title_element.text.strip()
+                    except:
+                        pass
+                    
+                    # Méthode 2: utiliser l'attribut data-roll-name-ancestor
+                    if not title:
+                        try:
+                            title = div.get_attribute("data-roll-name-ancestor")
+                        except:
+                            pass
+                    
+                    # Si on a trouvé un titre
+                    if title:
+                        # Récupérer tous les paragraphes
+                        paragraphs = div.find_elements(By.TAG_NAME, "p")
+                        description = "\n".join([p.text.strip() for p in paragraphs])
+                        
+                        # Ajouter au dictionnaire des traits
+                        traits[title] = description
+                        logger.debug(f"Extracted trait: {title}")
+                except Exception as e:
+                    logger.warning(f"Failed to extract individual trait: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to extract detailed traits: {e}")
+        
+        # 4. Extraire des informations supplémentaires (ex: ability scores) de la racine de la page
+        try:
+            # Chercher les div.rd__b--1 et div.rd__b--2 qui peuvent contenir des informations importantes
+            ability_divs = page_content.find_elements(By.CSS_SELECTOR, "div.rd__b--1, div.rd__b--2")
+            for div in ability_divs:
+                text = div.text.strip()
+                
+                # Analyser le texte pour déterminer quel type d'information il contient
+                if "Ability Score" in text:
+                    traits["Ability Score Increase"] = text
+                    logger.debug("Extracted Ability Score Increase")
+                # Ajouter d'autres conditions au besoin
+        except Exception as e:
+            logger.warning(f"Failed to extract additional information: {e}")
+        
+        # 5. Extraire toutes les autres balises tr de la table pagecontent
+        try:
+            # Trouver toutes les lignes de la table
+            rows = page_content.find_elements(By.TAG_NAME, "tr")
+            
+            for i, row in enumerate(rows):
+                # Ignorer les lignes d'en-tête que nous avons déjà traitées
+                if i < 2:  # Généralement les 2 premières lignes
+                    continue
+                
+                # Vérifier si la ligne contient des données utiles
+                cells = row.find_elements(By.TAG_NAME, "td")
+                if cells:
+                    for cell in cells:
+                        text = cell.text.strip()
+                        if text and "Source:" not in text and len(text) > 5:  # Éviter les cellules vides ou inutiles
+                            # Ajouter comme information supplémentaire numérotée
+                            key = f"Additional_Info_{i}"
+                            traits[key] = text
+                            logger.debug(f"Extracted additional row data: {key}")
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract table rows: {e}")
+        
+        # Si aucun trait n'a été trouvé, capturer tout le contenu de la page comme fallback
+        if not traits:
+            try:
+                content = page_content.text.strip()
+                traits["full_page_content"] = content
+                logger.debug("Captured full page content as fallback")
+            except Exception as e:
+                logger.error(f"Failed to capture page content: {e}")
+        
+        logger.info(f"Extracted {len(traits)} traits in total")
         return traits
     except Exception as e:
         logger.error(f"Error extracting traits data: {e}")
