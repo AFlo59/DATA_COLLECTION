@@ -516,14 +516,19 @@ def extract_info_data(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
     try:
         # Look for the Info tab and click it
         try:
-            info_tab = driver.find_element(By.XPATH, "//button[contains(text(), 'Info')]")
+            # Utiliser une attente plus courte pour éviter les longs timeouts quand l'onglet n'existe pas
+            short_wait = WebDriverWait(driver, 1)
+            info_tab = short_wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(text(), 'Info')]")))
             driver.execute_script("arguments[0].click();", info_tab)
             logger.info("Clicked Info tab")
             
             # Wait for info content to load
             time.sleep(1)
+        except TimeoutException:
+            logger.info("No Info tab found (timeout)")
+            return info
         except Exception as e:
-            logger.info(f"No Info tab found: {e}")
+            logger.info(f"No Info tab found: {str(e).split('\n')[0]}")
             return info
             
         # Wait for the page content table to load
@@ -599,25 +604,44 @@ def extract_image_data(driver: Any, wait: WebDriverWait) -> Optional[SpecieImage
     """
     try:
         # Look for the Images tab and click it
-        images_tab = driver.find_element(By.XPATH, "//button[contains(text(), 'Images')]")
-        driver.execute_script("arguments[0].click();", images_tab)
-        logger.info("Clicked Images tab")
+        try:
+            # Utiliser une attente plus courte pour éviter les longs timeouts quand l'onglet n'existe pas
+            short_wait = WebDriverWait(driver, 1)
+            images_tab = short_wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(text(), 'Images')]")))
+            driver.execute_script("arguments[0].click();", images_tab)
+            logger.info("Clicked Images tab")
+        except TimeoutException:
+            logger.info("No Images tab found (timeout)")
+            return None
+        except Exception as e:
+            logger.info(f"No Images tab found: {str(e).split('\n')[0]}")
+            return None
         
         # Wait for image content to load
         time.sleep(1)
         
         # Look for the image link
-        image_link = driver.find_element(By.CSS_SELECTOR, "a[href*='img/']")
-        image_url = image_link.get_attribute("href")
-        
-        if image_url:
-            logger.info(f"Found image URL: {image_url}")
-            return SpecieImage(url=image_url)
-        else:
-            logger.warning("Image URL not found")
+        try:
+            short_wait = WebDriverWait(driver, 1)
+            image_link = short_wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "a[href*='img/']")))
+            image_url = image_link.get_attribute("href")
+            
+            if image_url:
+                logger.info(f"Found image URL: {image_url}")
+                return SpecieImage(url=image_url)
+            else:
+                logger.warning("Image URL not found")
+                return None
+        except TimeoutException:
+            logger.info("No image link found (timeout)")
+            return None
+        except Exception as e:
+            logger.info(f"No image link found: {str(e).split('\n')[0]}")
             return None
     except Exception as e:
-        logger.info(f"No image tab or image found: {e}")
+        # Limiter la taille du message d'erreur dans les logs
+        error_msg = str(e).split('\n')[0] if '\n' in str(e) else str(e)
+        logger.info(f"Error extracting image data: {error_msg}")
         return None
 
 
