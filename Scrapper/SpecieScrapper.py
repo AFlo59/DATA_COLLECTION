@@ -381,7 +381,7 @@ def extract_species_metadata(driver: Any, wait: WebDriverWait) -> List[SpecieBas
 
 def extract_traits_data_table_based(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
     """
-    Extract traits data using a simplified table-based approach.
+    Extract ALL content from the traits tab pagecontent table.
     
     Args:
         driver: Browser driver instance
@@ -400,7 +400,7 @@ def extract_traits_data_table_based(driver: Any, wait: WebDriverWait) -> Dict[st
         # Get the main page content table
         page_content = driver.find_element(By.ID, "pagecontent")
         
-        # Extract the header row for species name and source
+        # First, extract the basic header information
         header_rows = page_content.find_elements(By.CSS_SELECTOR, "tr th.stats__th-name")
         if header_rows:
             header = header_rows[0]
@@ -424,250 +424,85 @@ def extract_traits_data_table_based(driver: Any, wait: WebDriverWait) -> Dict[st
             if page_links:
                 traits["page"] = page_links[0].text.strip()
         
-        # Process all rows in the table
-        rows = page_content.find_elements(By.TAG_NAME, "tr")
-        logger.debug(f"Found {len(rows)} rows in the table")
+        # Get complete HTML content of the pagecontent table
+        html_content = page_content.get_attribute("outerHTML")
+        if html_content:
+            traits["html_content"] = html_content
         
-        # Variable to track if we've found any traits
-        traits_found = False
+        # Get the plain text content of the table
+        text_content = page_content.text.strip()
+        if text_content:
+            traits["text_content"] = text_content
         
-        for row_index, row in enumerate(rows):
-            # Skip header rows
-            if row_index < 2:
+        # Extract all individual sections systematically
+        # 1. Basic traits list items (Ability Scores, Size, Speed, etc.)
+        basic_traits = {}
+        ul_elements = page_content.find_elements(By.CSS_SELECTOR, "ul.rd__list-hang-notitle li")
+        for li in ul_elements:
+            try:
+                name_elem = li.find_element(By.CSS_SELECTOR, "span.bold, span.rd__list-item-name")
+                name = name_elem.text.strip().rstrip(':')
+                full_text = li.text.strip()
+                if name in full_text:
+                    value = full_text[full_text.find(name) + len(name):].strip()
+                    if value.startswith(':'):
+                        value = value[1:].strip()
+                    basic_traits[name] = value
+            except:
                 continue
-                
-            # Process cells in this row
-            cells = row.find_elements(By.TAG_NAME, "td")
-            if not cells:
+        
+        if basic_traits:
+            traits["basic_traits"] = basic_traits
+        
+        # 2. All trait divs with their names and content
+        trait_divs = {}
+        all_trait_divs = page_content.find_elements(By.CSS_SELECTOR, "div[data-roll-name-ancestor]")
+        for div in all_trait_divs:
+            try:
+                trait_name = div.get_attribute("data-roll-name-ancestor")
+                if trait_name:
+                    trait_divs[trait_name] = div.text.strip()
+            except:
                 continue
-            
-            for cell_index, cell in enumerate(cells):
-                # Handle source row
-                if "Source:" in cell.text:
-                    traits["source_full_text"] = cell.text.strip()
-                    continue
-                
-                # Main data cells (with colspan)
-                if cell.get_attribute("colspan"):
-                    # First check for basic traits list (ul elements)
-                    ul_elements = cell.find_elements(By.CSS_SELECTOR, "ul.rd__list-hang-notitle, ul.rd__list")
-                    for ul_index, ul in enumerate(ul_elements):
-                        li_elements = ul.find_elements(By.TAG_NAME, "li")
-                        for li_index, li in enumerate(li_elements):
-                            try:
-                                # Get attribute name and value
-                                name_elem = li.find_element(By.CSS_SELECTOR, "span.bold, span.rd__list-item-name")
-                                name = name_elem.text.strip().rstrip(':')
-                                
-                                full_text = li.text.strip()
-                                if name in full_text:
-                                    value = full_text[full_text.find(name) + len(name):].strip()
-                                    if value.startswith(':'):
-                                        value = value[1:].strip()
-                                    
-                                    traits[name] = value
-                                    traits_found = True
-                                    logger.debug(f"Extracted basic trait: {name} = {value}")
-                            except Exception as e:
-                                logger.debug(f"Error with list item {li_index} in ul {ul_index}: {e}")
-                    
-                    # Then process all trait divs
-                    # First try to get the main container
-                    main_divs = cell.find_elements(By.CSS_SELECTOR, "div.rd__b--2")
-                    for main_div_index, main_div in enumerate(main_divs):
-                        # Get trait divs within this container
-                        trait_divs = main_div.find_elements(By.CSS_SELECTOR, "div.rd__b--3, div[data-roll-name-ancestor]")
-                        
-                        for div_index, div in enumerate(trait_divs):
-                            try:
-                                # Get trait name
-                                trait_name = None
-                                
-                                # Try from data attribute
-                                trait_name = div.get_attribute("data-roll-name-ancestor")
-                                
-                                # Try from header span
-                                if not trait_name:
-                                    try:
-                                        name_span = div.find_element(By.CSS_SELECTOR, "span.entry-title-inner")
-                                        trait_name = name_span.text.strip()
-                                    except:
-                                        pass
-                                
-                                # If still no name, use index
-                                if not trait_name:
-                                    trait_name = f"Trait_{div_index + 1}"
-                                
-                                # Get trait value from paragraphs
-                                paragraphs = div.find_elements(By.TAG_NAME, "p")
-                                trait_value = "\n".join([p.text.strip() for p in paragraphs if p.text.strip()])
-                                
-                                # If no paragraphs, get full text
-                                if not trait_value:
-                                    trait_value = div.text.strip()
-                                    # If the text starts with the trait name, remove it
-                                    if trait_value.startswith(trait_name):
-                                        trait_value = trait_value[len(trait_name):].strip()
-                                        if trait_value.startswith('.'):
-                                            trait_value = trait_value[1:].strip()
-                                
-                                # Store the trait
-                                traits[trait_name] = trait_value
-                                traits_found = True
-                                logger.debug(f"Extracted trait: {trait_name}")
-                                
-                                # Extract links within this trait
-                                links = div.find_elements(By.TAG_NAME, "a")
-                                if links:
-                                    link_data = []
-                                    for link in links:
-                                        try:
-                                            link_text = link.text.strip()
-                                            link_href = link.get_attribute("href")
-                                            if link_text and link_href:
-                                                link_info = {
-                                                    "text": link_text,
-                                                    "href": link_href
-                                                }
-                                                # Add type if available
-                                                if link.get_attribute("data-vet-page"):
-                                                    link_info["type"] = link.get_attribute("data-vet-page").replace(".html", "")
-                                                link_data.append(link_info)
-                                        except:
-                                            continue
-                                    
-                                    if link_data:
-                                        traits[f"{trait_name}_links"] = link_data
-                                
-                                # Process nested lists within this trait
-                                nested_lists = div.find_elements(By.CSS_SELECTOR, "ul")
-                                if nested_lists:
-                                    list_items = []
-                                    for list_index, ul in enumerate(nested_lists):
-                                        li_elements = ul.find_elements(By.TAG_NAME, "li")
-                                        for item_index, li in enumerate(li_elements):
-                                            try:
-                                                # Try to get item name
-                                                item_name = None
-                                                try:
-                                                    name_elem = li.find_element(By.CSS_SELECTOR, "span.bold")
-                                                    item_name = name_elem.text.strip().rstrip(':')
-                                                except:
-                                                    pass
-                                                
-                                                # Get full text
-                                                item_text = li.text.strip()
-                                                
-                                                # If we have a name, extract just the description
-                                                if item_name and item_name in item_text:
-                                                    item_value = item_text[item_text.find(item_name) + len(item_name):].strip()
-                                                    if item_value.startswith(':'):
-                                                        item_value = item_value[1:].strip()
-                                                else:
-                                                    item_value = item_text
-                                                    item_name = f"Option_{item_index + 1}"
-                                                
-                                                # Add to list items
-                                                list_items.append({
-                                                    "name": item_name,
-                                                    "value": item_value
-                                                })
-                                            except Exception as e:
-                                                logger.debug(f"Error with nested list item: {e}")
-                                    
-                                    if list_items:
-                                        traits[f"{trait_name}_options"] = list_items
-                            except Exception as e:
-                                logger.warning(f"Error processing trait div {div_index}: {e}")
-                    
-                    # If main_divs approach didn't find anything, try direct div extraction
-                    if not traits_found:
-                        trait_divs = cell.find_elements(By.CSS_SELECTOR, "div.rd__b--3, div[data-roll-name-ancestor]")
-                        if trait_divs:
-                            logger.debug(f"Trying direct extraction of {len(trait_divs)} trait divs")
-                            
-                            for div_index, div in enumerate(trait_divs):
-                                try:
-                                    # Get trait name
-                                    trait_name = None
-                                    
-                                    # Try from data attribute
-                                    trait_name = div.get_attribute("data-roll-name-ancestor")
-                                    
-                                    # Try from header span
-                                    if not trait_name:
-                                        try:
-                                            name_span = div.find_element(By.CSS_SELECTOR, "span.entry-title-inner")
-                                            trait_name = name_span.text.strip()
-                                        except:
-                                            pass
-                                    
-                                    # If still no name, use index
-                                    if not trait_name:
-                                        trait_name = f"Trait_{div_index + 1}"
-                                    
-                                    # Get trait value from paragraphs
-                                    paragraphs = div.find_elements(By.TAG_NAME, "p")
-                                    trait_value = "\n".join([p.text.strip() for p in paragraphs if p.text.strip()])
-                                    
-                                    # If no paragraphs, get full text
-                                    if not trait_value:
-                                        trait_value = div.text.strip()
-                                        # If the text starts with the trait name, remove it
-                                        if trait_value.startswith(trait_name):
-                                            trait_value = trait_value[len(trait_name):].strip()
-                                            if trait_value.startswith('.'):
-                                                trait_value = trait_value[1:].strip()
-                                    
-                                    # Store the trait
-                                    traits[trait_name] = trait_value
-                                    traits_found = True
-                                    logger.debug(f"Extracted trait directly: {trait_name}")
-                                except Exception as e:
-                                    logger.warning(f"Error in direct trait extraction {div_index}: {e}")
-                    
-                    # If we STILL found nothing, capture the entire cell content
-                    if not traits_found and cell.text.strip():
-                        traits["full_content"] = cell.text.strip()
-                        logger.debug("Captured full cell content as fallback")
         
-        # Make sure we got all the important basic traits
-        # Sometimes they might be in different structures
-        # Let's double check for Ability Scores, Creature Type, Size, Speed
-        basic_traits = ["Ability Scores", "Creature Type", "Size", "Speed"]
-        for trait in basic_traits:
-            if trait not in traits:
-                logger.debug(f"Looking for missing trait: {trait}")
-                # Try to find elements with this trait name
-                try:
-                    elements = driver.find_elements(By.XPATH, f"//span[contains(text(), '{trait}:')]")
-                    if elements:
-                        for element in elements:
-                            parent = element.find_element(By.XPATH, "./..")
-                            if parent:
-                                trait_text = parent.text.strip()
-                                if trait in trait_text:
-                                    # Extract the value
-                                    value = trait_text[trait_text.find(trait) + len(trait):].strip()
-                                    if value.startswith(':'):
-                                        value = value[1:].strip()
-                                    
-                                    traits[trait] = value
-                                    logger.debug(f"Found missing trait: {trait} = {value}")
-                except Exception as e:
-                    logger.debug(f"Error looking for missing trait {trait}: {e}")
+        if trait_divs:
+            traits["trait_divs"] = trait_divs
         
-        logger.info(f"Extracted {len(traits)} traits using table-based approach")
+        # 3. Extract source text from the last row
+        source_cells = page_content.find_elements(By.XPATH, "//tr/td[contains(text(), 'Source:')]")
+        if source_cells:
+            traits["source_text"] = source_cells[0].text.strip()
+        
+        # 4. Handle subraces if present
+        subrace_elements = page_content.find_elements(By.CSS_SELECTOR, "ul.rd__list a")
+        subraces = []
+        for subrace in subrace_elements:
+            try:
+                name = subrace.text.strip()
+                link = subrace.get_attribute("href")
+                if name and link:
+                    subraces.append({"name": name, "url": link})
+            except:
+                continue
+        
+        if subraces:
+            traits["subraces"] = subraces
+        
+        # Return all collected data
+        logger.info(f"Extracted complete traits data with {len(basic_traits)} basic traits and {len(trait_divs)} trait sections")
         return traits
+        
     except Exception as e:
-        logger.error(f"Error in table-based traits extraction: {e}")
+        logger.error(f"Error extracting traits data: {e}")
         logger.debug(traceback.format_exc())
+        
+        # Return empty dict if failed
         return {}
 
 
 def extract_info_data(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
     """
-    Extract info data from the 'Info' tab of a species.
+    Extract ALL content from the Info tab pagecontent table.
     
     Args:
         driver: Browser driver instance
@@ -701,101 +536,49 @@ def extract_info_data(driver: Any, wait: WebDriverWait) -> Dict[str, Any]:
         # Get the main page content table
         page_content = driver.find_element(By.ID, "pagecontent")
         
-        # Extract the main text content first - this is often a simple paragraph
-        # in the first cell after the header
-        rows = page_content.find_elements(By.TAG_NAME, "tr")
+        # Get complete HTML content of the info tab
+        html_content = page_content.get_attribute("outerHTML")
+        if html_content:
+            info["html_content"] = html_content
         
-        if len(rows) > 1:  # Make sure we have at least a header and a content row
-            # Get all cells in the first content row
-            cells = rows[1].find_elements(By.TAG_NAME, "td")
-            
-            if cells:
-                # Extract text from the cell
-                main_text = cells[0].text.strip()
-                if main_text:
-                    info["description"] = main_text
-                    logger.debug(f"Extracted main info description: {main_text[:50]}...")
-                
-                # Also check for paragraphs to get them individually
-                paragraphs = cells[0].find_elements(By.TAG_NAME, "p")
-                if paragraphs and len(paragraphs) > 1:  # If we have multiple paragraphs
-                    for i, p in enumerate(paragraphs):
-                        text = p.text.strip()
-                        if text:
-                            info[f"paragraph_{i+1}"] = text
-                            logger.debug(f"Extracted paragraph {i+1}: {text[:50]}...")
+        # Get the plain text content
+        text_content = page_content.text.strip()
+        if text_content:
+            info["text_content"] = text_content
         
-        # Process all div elements in the Info tab
-        info_divs = page_content.find_elements(By.CSS_SELECTOR, "div.rd__b")
+        # Extract all paragraphs systematically
+        all_paragraphs = []
+        paragraphs = page_content.find_elements(By.TAG_NAME, "p")
+        for p in paragraphs:
+            text = p.text.strip()
+            if text:
+                all_paragraphs.append(text)
         
-        for div_index, div in enumerate(info_divs):
+        if all_paragraphs:
+            info["paragraphs"] = all_paragraphs
+        
+        # Extract all sections with titles
+        sections = {}
+        h_elements = page_content.find_elements(By.CSS_SELECTOR, "h1, h2, h3, h4, h5, span.entry-title-inner")
+        for h in h_elements:
             try:
-                # Get section title
-                title = None
-                # Try from entry-title-inner span
-                try:
-                    title_elem = div.find_element(By.CSS_SELECTOR, "span.entry-title-inner")
-                    title = title_elem.text.strip()
-                except:
-                    pass
+                title = h.text.strip()
+                # Find the parent or next sibling containing content
+                parent = h.find_element(By.XPATH, "./..")
+                content = parent.text.strip()
+                # Remove the title from the content
+                if title and title in content:
+                    content = content.replace(title, "", 1).strip()
                 
-                # Try from data attribute if first method failed
-                if not title:
-                    try:
-                        title = div.get_attribute("data-title")
-                    except:
-                        pass
-                
-                # If still no title, use a generic one
-                if not title:
-                    title = f"Info_Section_{div_index + 1}"
-                
-                # Get section content
-                paragraphs = div.find_elements(By.TAG_NAME, "p")
-                content = "\n".join([p.text.strip() for p in paragraphs if p.text.strip()])
-                
-                # If no paragraphs found, get the full text
-                if not content:
-                    content = div.text.strip()
-                
-                # Store in our info dictionary
-                if content:
-                    info[title] = content
-                    logger.debug(f"Extracted info section: {title}")
-                    
-                    # Also extract links if any
-                    links = div.find_elements(By.TAG_NAME, "a")
-                    if links:
-                        link_data = []
-                        for link in links:
-                            try:
-                                link_text = link.text.strip()
-                                link_href = link.get_attribute("href")
-                                if link_text and link_href:
-                                    link_data.append({
-                                        "text": link_text,
-                                        "href": link_href
-                                    })
-                            except:
-                                continue
-                        
-                        if link_data:
-                            info[f"{title}_links"] = link_data
-            except Exception as e:
-                logger.warning(f"Error extracting info div {div_index}: {e}")
+                if title and content:
+                    sections[title] = content
+            except:
+                continue
         
-        # If we haven't found any info yet, try a more direct approach
-        if not info:
-            try:
-                # Simply get all the text from the table
-                full_text = page_content.text.strip()
-                if full_text:
-                    info["full_content"] = full_text
-                    logger.debug("Captured full info content as fallback")
-            except Exception as e:
-                logger.warning(f"Error capturing full info content: {e}")
+        if sections:
+            info["sections"] = sections
         
-        logger.info(f"Extracted {len(info)} info sections")
+        logger.info(f"Extracted complete info data with {len(all_paragraphs)} paragraphs and {len(sections)} sections")
         return info
     except Exception as e:
         logger.error(f"Error extracting info data: {e}")
@@ -840,82 +623,91 @@ def extract_image_data(driver: Any, wait: WebDriverWait) -> Optional[SpecieImage
 
 def process_specie(driver: Any, wait: WebDriverWait, specie: SpecieBase) -> Optional[SpecieData]:
     """
-    Process a single species to extract all its data.
+    Process a single specie, extracting traits, info, and image data.
     
     Args:
         driver: Browser driver instance
         wait: WebDriverWait instance
-        specie: SpecieBase object with basic species info
-        
+        specie: SpecieBase instance with basic specie data
+    
     Returns:
-        SpecieData object with full species data if successful, None otherwise
+        SpecieData instance with detailed specie data or None if failed
     """
     try:
-        # Navigate to species page
-        logger.info(f"Processing species: {specie.name} ({specie.source})")
-        driver.get(specie.url)
+        logger.info(f"Processing specie: {specie.name} (Source: {specie.source})")
         
-        # Wait for page to load
-        logger.info("Waiting for species page to load...")
+        # Navigate to the specie URL
+        if not specie.url.startswith("https://"):
+            url = f"https://5e.tools/{specie.url}"
+        else:
+            url = specie.url
+            
+        driver.get(url)
+        logger.info(f"Navigated to: {url}")
+        
+        # Wait for the page to load
+        wait.until(EC.presence_of_element_located((By.ID, "pagecontent")))
+        logger.info("Page loaded successfully")
+        
+        # Disable various UI elements for cleaner extraction
         try:
-            # Wait for page content to be visible
-            wait.until(EC.presence_of_element_located((By.ID, "pagecontent")))
-            logger.info("Species page loaded")
-        except TimeoutException:
-            logger.warning("Timeout waiting for species page to load, continuing anyway")
+            # Use JavaScript to click each button one by one
+            for button_id in ["btn-roll-hide", "btn-spellbook-hide", "btn-table-hide", "btn-meta-show"]:
+                try:
+                    button = driver.find_element(By.ID, button_id)
+                    driver.execute_script("arguments[0].click();", button)
+                    time.sleep(0.2)  # Small delay between clicks
+                    logger.debug(f"Clicked button: {button_id}")
+                except:
+                    logger.debug(f"Button {button_id} not found")
+        except Exception as e:
+            logger.warning(f"Error disabling UI elements: {e}")
+            
+        # Extract traits data
+        traits = extract_traits_data_table_based(driver, wait)
+        logger.info(f"Extracted {len(traits)} trait entries")
         
-        time.sleep(1)  # Give extra time for page to stabilize
+        # Extract info data
+        info = extract_info_data(driver, wait)
+        logger.info(f"Extracted {len(info)} info entries")
         
-        # Create full species data object
-        full_data = SpecieData(
+        # Extract image data
+        image = extract_image_data(driver, wait)
+        if image:
+            logger.info(f"Extracted image URL: {image.url}")
+            
+            # Generate file path for the image
+            safe_name = sanitize_filename(f"{specie.name}_{specie.source}".lower())
+            image_path = os.path.join("Data", "Specie", "Images", f"{safe_name}.webp")
+            
+            # Download image
+            if download_image_sync(driver, image.url, image_path):
+                image.file_path = image_path
+                image.downloaded = True
+                logger.info(f"Downloaded image to: {image_path}")
+            else:
+                logger.warning(f"Failed to download image for {specie.name}")
+        else:
+            logger.info("No image found")
+            
+        # Create the specie data
+        species_data = SpecieData(
             name=specie.name,
             source=specie.source,
-            url=specie.url
+            url=specie.url,
+            traits=traits,
+            info=info,
+            image=image,
+            processed=True
         )
         
-        # Extract traits data using the table-based approach (default tab)
-        full_data.traits = extract_traits_data_table_based(driver, wait)
+        # Save the JSON data
+        save_specie_data(species_data)
         
-        # Save the data immediately after getting traits (in case other tabs fail)
-        save_specie_data(full_data)
+        return species_data
         
-        # Try to extract info data if the tab exists
-        try:
-            info_tab = driver.find_element(By.XPATH, "//button[contains(text(), 'Info')]")
-            if info_tab:
-                full_data.info = extract_info_data(driver, wait)
-                # Update saved data
-                save_specie_data(full_data)
-        except:
-            logger.info(f"No Info tab found for {specie.name}")
-        
-        # Try to extract image data if the tab exists
-        try:
-            images_tab = driver.find_element(By.XPATH, "//button[contains(text(), 'Images')]")
-            if images_tab:
-                full_data.image = extract_image_data(driver, wait)
-                
-                # Download image if URL found
-                if full_data.image and full_data.image.url:
-                    # Generate file path
-                    safe_name = sanitize_filename(f"{specie.name}_{specie.source}".lower())
-                    image_path = os.path.join("Data", "Specie", "Images", f"{safe_name}.webp")
-                    
-                    # Download image
-                    if download_image_sync(driver, full_data.image.url, image_path):
-                        full_data.image.file_path = image_path
-                        full_data.image.downloaded = True
-                
-                # Update saved data
-                save_specie_data(full_data)
-        except:
-            logger.info(f"No Images tab found for {specie.name}")
-        
-        full_data.processed = True
-        logger.info(f"Successfully processed species: {specie.name}")
-        return full_data
     except Exception as e:
-        logger.error(f"Error processing species {specie.name}: {e}")
+        logger.error(f"Error processing specie {specie.name}: {e}")
         logger.debug(traceback.format_exc())
         return None
 
